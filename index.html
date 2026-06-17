@@ -105,7 +105,7 @@
     </div>
 
     <div class="panel show" id="predict">
-      <div class="hint">Choose a result for each upcoming game, then hit Save. You can change picks any time before kickoff.</div>
+      <div class="hint">Choose a result for each upcoming game, then hit Save. You can change picks any time before kickoff. All times shown in 🇮🇪 Irish time.</div>
       <div id="predictList"></div>
     </div>
 
@@ -144,8 +144,10 @@ let revealed = [];         // predictions visible (post-kickoff) from the DB
 
 const toast = msg => { const t=$('toast'); t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),1800); };
-const fmtKO = iso => new Date(iso).toLocaleString([], {weekday:'short', month:'short',
-  day:'numeric', hour:'numeric', minute:'2-digit'});
+// Always display kickoff in Irish time (Europe/Dublin handles IST/summer time),
+// so all players see the same time regardless of their device's timezone.
+const fmtKO = iso => new Date(iso).toLocaleString('en-IE', {weekday:'short', month:'short',
+  day:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'Europe/Dublin'});
 const started = m => new Date(m.kickoff) <= new Date();
 const outcome = m => (m.home_score==null||m.away_score==null) ? null
   : m.home_score>m.away_score ? 'H' : m.home_score<m.away_score ? 'A' : 'D';
