@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Cup 2026 Predictor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a1f14; --bg2:#0e2a1b; --grass:#2faf5a; --grass-d:#1c7d3f;
+    --card:#10241a; --line:rgba(255,255,255,.08); --text:#eafff0;
+    --muted:#8fb39c; --gold:#ffd34d; --red:#ff6b6b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter',-apple-system,system-ui,sans-serif;
+    background:linear-gradient(160deg,var(--bg),var(--bg2));
+    color:var(--text); min-height:100vh; padding:24px 14px 60px;
+  }
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-size:1.5rem;font-weight:800;letter-spacing:.02em;text-align:center}
+  h1 .ball{filter:drop-shadow(0 2px 6px rgba(0,0,0,.4))}
+  .sub{text-align:center;color:var(--muted);font-size:.82rem;margin-top:4px}
+
+  /* login bar */
+  .login{display:flex;gap:8px;align-items:center;justify-content:center;
+    margin:20px auto;flex-wrap:wrap}
+  .login input{padding:10px 14px;border-radius:10px;border:1px solid var(--line);
+    background:#0c1d14;color:var(--text);font:inherit;min-width:200px}
+  .login .who{font-weight:700;color:var(--grass)}
+  button{font:inherit;cursor:pointer;border:none;border-radius:10px;
+    padding:10px 16px;font-weight:600}
+  .primary{background:linear-gradient(180deg,var(--grass),var(--grass-d));color:#06210f}
+  .ghost{background:#0c1d14;color:var(--text);border:1px solid var(--line)}
+  .primary:hover{filter:brightness(1.08)} .ghost:hover{border-color:var(--grass)}
+
+  /* tabs */
+  .tabs{display:flex;gap:6px;justify-content:center;margin:22px 0 18px}
+  .tab{background:transparent;color:var(--muted);border:1px solid var(--line);
+    padding:9px 16px;border-radius:999px;font-size:.85rem}
+  .tab.active{background:var(--grass);color:#06210f;border-color:var(--grass)}
+
+  .panel{display:none} .panel.show{display:block}
+  .hint{color:var(--muted);font-size:.8rem;text-align:center;margin:8px 0 18px}
+
+  /* match cards */
+  .match{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:14px 16px;margin-bottom:12px}
+  .match .stage{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between}
+  .match .teams{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.02rem}
+  .match .teams .vs{color:var(--muted);font-weight:500;font-size:.8rem}
+  .match .ko{color:var(--muted);font-size:.74rem;font-weight:500}
+  .match select{width:100%;margin-top:11px;padding:11px 12px;border-radius:10px;
+    border:1px solid var(--line);background:#0c1d14;color:var(--text);font:inherit;cursor:pointer}
+  .match.locked select{opacity:.55;pointer-events:none}
+  .lockmsg{font-size:.72rem;color:var(--gold);margin-top:8px}
+
+  /* reveal grid */
+  .reveal .row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;
+    padding:8px 0;border-bottom:1px solid var(--line)}
+  .reveal .picks{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chip{font-size:.74rem;padding:4px 9px;border-radius:999px;background:#0c1d14;
+    border:1px solid var(--line)}
+  .chip b{color:var(--grass)}
+  .chip.hit{border-color:var(--grass);background:rgba(47,175,90,.16)}
+  .chip.miss{opacity:.6}
+  .result{font-weight:700;color:var(--gold);font-size:.85rem}
+  .pending{color:var(--muted);font-size:.78rem}
+
+  /* leaderboard */
+  .lb{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .lb .lrow{display:flex;justify-content:space-between;align-items:center;
+    padding:13px 18px;border-bottom:1px solid var(--line)}
+  .lb .lrow:last-child{border-bottom:none}
+  .lb .rank{color:var(--muted);width:26px;font-weight:700}
+  .lb .name{flex:1;font-weight:600}
+  .lb .pts{font-weight:800;color:var(--grass);font-variant-numeric:tabular-nums}
+  .lb .lrow.me{background:rgba(47,175,90,.08)}
+
+  .save{position:sticky;bottom:14px;margin-top:10px;width:100%;padding:15px;
+    font-size:1rem;letter-spacing:.04em}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+    background:var(--grass);color:#06210f;padding:11px 18px;border-radius:10px;
+    font-weight:700;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50}
+  .toast.show{opacity:1}
+  .empty{text-align:center;color:var(--muted);padding:40px 10px}
+  .err{background:rgba(255,107,107,.12);border:1px solid var(--red);color:#ffd9d9;
+    border-radius:10px;padding:12px 14px;font-size:.82rem;margin:14px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="ball">⚽</span> World&nbsp;Cup&nbsp;2026 Predictor</h1>
+  <div class="sub">Pick every game. Nobody sees your call until kickoff.</div>
+
+  <div class="login" id="loginBar"></div>
+
+  <div id="app" style="display:none">
+    <div class="tabs">
+      <button class="tab active" data-tab="predict">Make Picks</button>
+      <button class="tab" data-tab="reveal">Reveal</button>
+      <button class="tab" data-tab="board">Leaderboard</button>
+    </div>
+
+    <div class="panel show" id="predict">
+      <div class="hint">Choose a result for each upcoming game, then hit Save. You can change picks any time before kickoff.</div>
+      <div id="predictList"></div>
+    </div>
+
+    <div class="panel" id="reveal">
+      <div class="hint">Games that have kicked off — everyone's picks are now visible. ✓ = correct call.</div>
+      <div id="revealList"></div>
+    </div>
+
+    <div class="panel" id="board">
+      <div class="hint">+1 point for every correct result, once the final score is entered.</div>
+      <div id="boardList"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============================================================
+   CONFIG  —  paste your two Supabase values here.
+   Find them in: Supabase dashboard → Project Settings → API
+   ============================================================ */
+const SUPABASE_URL      = 'https://anqaowafgfjezzixnhgm.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFucWFvd2FmZ2ZqZXp6aXhuaGdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MTQ5MTQsImV4cCI6MjA5NzI5MDkxNH0.ldYd7cr94Ksv2egajajVjgbG2scdNfwLFCTndK5gj2Y';
+/* ============================================================ */
+
+const $ = id => document.getElementById(id);
+const PICK_LABEL = { H:'Home win', D:'Draw', A:'Away win' };
+const configured = !SUPABASE_URL.startsWith('YOUR_') && !SUPABASE_ANON_KEY.startsWith('YOUR_');
+const db = configured ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+let nick = localStorage.getItem('wc_nick') || '';
+let matches = [];          // all fixtures
+let picks   = {};          // my picks {match_id: 'H'|'D'|'A'} (local source of truth)
+let revealed = [];         // predictions visible (post-kickoff) from the DB
+
+const toast = msg => { const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1800); };
+const fmtKO = iso => new Date(iso).toLocaleString([], {weekday:'short', month:'short',
+  day:'numeric', hour:'numeric', minute:'2-digit'});
+const started = m => new Date(m.kickoff) <= new Date();
+const outcome = m => (m.home_score==null||m.away_score==null) ? null
+  : m.home_score>m.away_score ? 'H' : m.home_score<m.away_score ? 'A' : 'D';
+
+/* ---------- login ---------- */
+function renderLogin(){
+  const bar = $('loginBar');
+  if(nick){
+    bar.innerHTML = `Signed in as <span class="who">${nick}</span>
+      <button class="ghost" id="logout">Switch nickname</button>`;
+    $('logout').onclick = ()=>{ localStorage.removeItem('wc_nick'); nick=''; picks={}; init(); };
+    $('app').style.display='block';
+  }else{
+    bar.innerHTML = `<input id="nickInput" placeholder="Enter your nickname" maxlength="20">
+      <button class="primary" id="enter">Enter</button>`;
+    $('app').style.display='none';
+    const go = ()=>{ const v=$('nickInput').value.trim(); if(!v) return;
+      nick=v; localStorage.setItem('wc_nick',v); init(); };
+    $('enter').onclick = go;
+    $('nickInput').addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
+    $('nickInput').focus();
+  }
+}
+
+/* ---------- load data ---------- */
+async function loadMatches(){
+  const { data, error } = await db.from('matches').select('*').order('kickoff');
+  if(error) throw error;
+  matches = data || [];
+}
+async function loadRevealed(){
+  // RLS only returns predictions for matches that have kicked off
+  const { data, error } = await db.from('predictions').select('player,match_id,pick');
+  if(error) throw error;
+  revealed = data || [];
+}
+function loadMyPicks(){
+  picks = JSON.parse(localStorage.getItem('wc_picks_'+nick) || '{}');
+}
+
+/* ---------- predict tab ---------- */
+function renderPredict(){
+  const upcoming = matches.filter(m => !started(m));
+  const list = $('predictList');
+  if(!upcoming.length){ list.innerHTML = `<div class="empty">No upcoming games right now.<br>Check the Reveal tab for games already played.</div>`; return; }
+  list.innerHTML = upcoming.map(m => `
+    <div class="match">
+      <div class="stage"><span>${m.stage||''}</span><span class="ko">🔒 locks ${fmtKO(m.kickoff)}</span></div>
+      <div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>
+      <select data-id="${m.id}">
+        <option value="">— pick a result —</option>
+        <option value="H" ${picks[m.id]==='H'?'selected':''}>${m.home_team} to win</option>
+        <option value="D" ${picks[m.id]==='D'?'selected':''}>Draw</option>
+        <option value="A" ${picks[m.id]==='A'?'selected':''}>${m.away_team} to win</option>
+      </select>
+    </div>`).join('')
+    + `<button class="primary save" id="saveBtn">Save my picks</button>`;
+  list.querySelectorAll('select').forEach(sel=>{
+    sel.onchange = ()=>{ const id=sel.dataset.id;
+      if(sel.value) picks[id]=sel.value; else delete picks[id]; };
+  });
+  $('saveBtn').onclick = savePicks;
+}
+
+async function savePicks(){
+  const upcoming = matches.filter(m=>!started(m)).map(m=>String(m.id));
+  const rows = Object.entries(picks)
+    .filter(([id,p]) => upcoming.includes(String(id)) && p)
+    .map(([id,p]) => ({ player:nick, match_id:Number(id), pick:p }));
+  // keep my own copy locally (the DB hides it from me until kickoff)
+  localStorage.setItem('wc_picks_'+nick, JSON.stringify(picks));
+  if(!rows.length){ toast('Pick at least one game'); return; }
+  const { error } = await db.from('predictions').upsert(rows, { onConflict:'player,match_id' });
+  if(error){ toast('Save failed'); console.error(error); return; }
+  toast('✓ Saved — locked secrets!');
+}
+
+/* ---------- reveal tab ---------- */
+function renderReveal(){
+  const played = matches.filter(started).sort((a,b)=>new Date(b.kickoff)-new Date(a.kickoff));
+  const list = $('revealList');
+  if(!played.length){ list.innerHTML = `<div class="empty">No games have kicked off yet.</div>`; return; }
+  list.innerHTML = played.map(m=>{
+    const res = outcome(m);
+    const ps = revealed.filter(r=>r.match_id===m.id);
+    const chips = ps.length ? ps.map(r=>{
+      const cls = res ? (r.pick===res?'hit':'miss') : '';
+      return `<span class="chip ${cls}">${r.player}: <b>${PICK_LABEL[r.pick]}</b>${res&&r.pick===res?' ✓':''}</span>`;
+    }).join('') : `<span class="pending">No picks were submitted.</span>`;
+    const scoreLine = res
+      ? `<span class="result">${m.home_score}–${m.away_score} · ${PICK_LABEL[res]}</span>`
+      : `<span class="pending">awaiting result</span>`;
+    return `<div class="match reveal">
+      <div class="stage"><span>${m.stage||''}</span><span class="ko">${fmtKO(m.kickoff)}</span></div>
+      <div class="row"><div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>${scoreLine}</div>
+      <div class="picks">${chips}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- leaderboard ---------- */
+function renderBoard(){
+  const scores = {};
+  matches.forEach(m=>{
+    const res = outcome(m); if(!res) return;
+    revealed.filter(r=>r.match_id===m.id).forEach(r=>{
+      scores[r.player] = (scores[r.player]||0) + (r.pick===res?1:0);
+    });
+  });
+  // make sure everyone who ever picked shows up, even on 0
+  revealed.forEach(r=>{ if(!(r.player in scores)) scores[r.player]=0; });
+  const ranked = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const list = $('boardList');
+  if(!ranked.length){ list.innerHTML = `<div class="empty">No results scored yet. Standings appear once final scores are entered.</div>`; return; }
+  list.innerHTML = `<div class="lb">` + ranked.map(([name,pts],i)=>`
+    <div class="lrow ${name===nick?'me':''}">
+      <span class="rank">${i+1}</span>
+      <span class="name">${name}</span>
+      <span class="pts">${pts} pt${pts===1?'':'s'}</span>
+    </div>`).join('') + `</div>`;
+}
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick = ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('show'));
+    t.classList.add('active'); $(t.dataset.tab).classList.add('show');
+  };
+});
+
+/* ---------- init ---------- */
+async function init(){
+  renderLogin();
+  if(!nick) return;
+  if(!configured){
+    $('predictList').innerHTML = `<div class="err"><b>Not connected yet.</b><br>
+      Open this file and paste your Supabase URL + anon key into the CONFIG section near the top of the script. See SETUP.md.</div>`;
+    return;
+  }
+  loadMyPicks();
+  try{
+    await Promise.all([loadMatches(), loadRevealed()]);
+    renderPredict(); renderReveal(); renderBoard();
+  }catch(e){
+    console.error(e);
+    $('predictList').innerHTML = `<div class="err"><b>Couldn't reach the database.</b><br>
+      Double-check your Supabase keys in CONFIG, and that you ran schema.sql. (${e.message||e})</div>`;
+  }
+}
+init();
+</script>
+</body>
+</html>

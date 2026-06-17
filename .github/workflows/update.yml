@@ -1,0 +1,22 @@
+name: Sync World Cup fixtures & scores
+
+# Runs automatically every 15 minutes, plus a manual "Run workflow" button.
+on:
+  schedule:
+    - cron: '*/15 * * * *'      # every 15 min (UTC). GitHub may delay a few min — fine.
+  workflow_dispatch:            # lets you trigger it by hand from the Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Pull fixtures & scores into Supabase
+        env:
+          FOOTBALL_DATA_KEY:    ${{ secrets.FOOTBALL_DATA_KEY }}
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node scripts/sync.mjs
