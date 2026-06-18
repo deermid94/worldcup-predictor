@@ -1,1 +1,6 @@
 .DS_Store
+# Everyone's group-stage picks — secret until kickoff, never commit to a public repo.
+load-group-picks.sql
+picks-*.csv
+# The source spreadsheet of everyone's picks — also secret, keep out of the public repo.
+*.xlsx

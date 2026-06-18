@@ -26,9 +26,21 @@
   /* login bar */
   .login{display:flex;gap:8px;align-items:center;justify-content:center;
     margin:20px auto;flex-wrap:wrap}
-  .login input{padding:10px 14px;border-radius:10px;border:1px solid var(--line);
-    background:#0c1d14;color:var(--text);font:inherit;min-width:200px}
+  .login input,.login select{padding:10px 14px;border-radius:10px;border:1px solid var(--line);
+    background:#0c1d14;color:var(--text);font:inherit}
+  .login select{min-width:200px;cursor:pointer}
+  .login input{min-width:120px}
   .login .who{font-weight:700;color:var(--grass)}
+
+  /* change-PIN panel */
+  #pinPanel{max-width:340px;margin:0 auto}
+  #pinPanel .card2{background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:16px;margin:12px auto}
+  #pinPanel h3{font-size:.9rem;margin-bottom:6px}
+  #pinPanel input{width:100%;margin-bottom:8px;padding:10px 12px;border-radius:10px;
+    border:1px solid var(--line);background:#0c1d14;color:var(--text);font:inherit}
+  #pinPanel button{width:100%}
+  #pinPanel .ghost{margin-top:6px}
   button{font:inherit;cursor:pointer;border:none;border-radius:10px;
     padding:10px 16px;font-weight:600}
   .primary{background:linear-gradient(180deg,var(--grass),var(--grass-d));color:#06210f}
@@ -96,6 +108,7 @@
   <div class="sub">Pick every game. Nobody sees your call until kickoff.</div>
 
   <div class="login" id="loginBar"></div>
+  <div id="pinPanel"></div>
 
   <div id="app" style="display:none">
     <div class="tabs">
@@ -105,7 +118,7 @@
     </div>
 
     <div class="panel show" id="predict">
-      <div class="hint">Choose a result for each upcoming game, then hit Save. You can change picks any time before kickoff. All times shown in 🇮🇪 Irish time.</div>
+      <div class="hint">Group-stage picks are locked in 🔒. Knockout picks open here once those fixtures are set — change them any time before kickoff, then hit Save. All times shown in 🇮🇪 Irish time.</div>
       <div id="predictList"></div>
     </div>
 
@@ -138,6 +151,7 @@ const configured = !SUPABASE_URL.startsWith('YOUR_') && !SUPABASE_ANON_KEY.start
 const db = configured ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 let nick = localStorage.getItem('wc_nick') || '';
+let lastPin = '';          // PIN entered this session (not persisted) — for quick re-use by Change PIN
 let matches = [];          // all fixtures
 let picks   = {};          // my picks {match_id: 'H'|'D'|'A'} (local source of truth)
 let revealed = [];         // predictions visible (post-kickoff) from the DB
@@ -149,27 +163,93 @@ const toast = msg => { const t=$('toast'); t.textContent=msg; t.classList.add('s
 const fmtKO = iso => new Date(iso).toLocaleString('en-IE', {weekday:'short', month:'short',
   day:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'Europe/Dublin'});
 const started = m => new Date(m.kickoff) <= new Date();
+// Group-stage picks are loaded once and locked — never editable from the site.
+const isGroup = m => (m.stage||'').toLowerCase().startsWith('group');
 const outcome = m => (m.home_score==null||m.away_score==null) ? null
   : m.home_score>m.away_score ? 'H' : m.home_score<m.away_score ? 'A' : 'D';
 
 /* ---------- login ---------- */
-function renderLogin(){
+async function renderLogin(){
   const bar = $('loginBar');
   if(nick){
     bar.innerHTML = `Signed in as <span class="who">${nick}</span>
-      <button class="ghost" id="logout">Switch nickname</button>`;
-    $('logout').onclick = ()=>{ localStorage.removeItem('wc_nick'); nick=''; picks={}; init(); };
+      <button class="ghost" id="changePin">Change PIN</button>
+      <button class="ghost" id="logout">Switch player</button>`;
+    $('changePin').onclick = ()=>showChangePin(false);
+    $('logout').onclick = ()=>{ localStorage.removeItem('wc_nick'); nick=''; lastPin='';
+      picks={}; $('pinPanel').innerHTML=''; init(); };
     $('app').style.display='block';
-  }else{
-    bar.innerHTML = `<input id="nickInput" placeholder="Enter your nickname" maxlength="20">
-      <button class="primary" id="enter">Enter</button>`;
-    $('app').style.display='none';
-    const go = ()=>{ const v=$('nickInput').value.trim(); if(!v) return;
-      nick=v; localStorage.setItem('wc_nick',v); init(); };
-    $('enter').onclick = go;
-    $('nickInput').addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
-    $('nickInput').focus();
+    return;
   }
+  $('app').style.display='none';
+  if(!db){ bar.innerHTML = `<span class="who">Not connected — see SETUP.md</span>`; return; }
+
+  // Pull the fixed list of players for the dropdown.
+  bar.innerHTML = `<span style="color:var(--muted)">Loading players…</span>`;
+  let names = [];
+  try{
+    const { data, error } = await db.rpc('list_players');
+    if(error) throw error;
+    names = data || [];
+  }catch(e){
+    console.error(e);
+    bar.innerHTML = `<span class="who">Couldn't load players — run auth-and-lock.sql?</span>`;
+    return;
+  }
+
+  bar.innerHTML = `
+    <select id="nameSel">
+      <option value="">— choose your name —</option>
+      ${names.map(n=>`<option value="${n}">${n}</option>`).join('')}
+    </select>
+    <input id="pinInput" type="password" inputmode="numeric" placeholder="PIN" maxlength="12">
+    <button class="primary" id="enter">Enter</button>`;
+
+  const go = async ()=>{
+    const name = $('nameSel').value;
+    const pin  = $('pinInput').value.trim();
+    if(!name){ toast('Choose your name'); return; }
+    if(!pin){ toast('Enter your PIN'); return; }
+    try{
+      const { data, error } = await db.rpc('claim_or_verify', { p_name:name, p_pin:pin });
+      if(error) throw error;
+      if(!data){ toast('Wrong PIN for that name'); return; }
+    }catch(e){ console.error(e); toast('Login error'); return; }
+    nick = name; lastPin = pin; localStorage.setItem('wc_nick', name);
+    await init();
+    // Still on the shared temp PIN? Nudge them to set their own.
+    if(pin === '0000') showChangePin(true);
+  };
+  $('enter').onclick = go;
+  $('pinInput').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+}
+
+/* ---------- change PIN ---------- */
+function showChangePin(forced){
+  const p = $('pinPanel');
+  p.innerHTML = `
+    <div class="card2">
+      <h3>${forced ? 'Set your own PIN' : 'Change PIN'}</h3>
+      ${forced ? `<div class="hint" style="margin:0 0 10px">You're on the temporary PIN. Pick your own so nobody else can log in as <b>${nick}</b>.</div>` : ''}
+      <input id="curPin" type="password" inputmode="numeric" maxlength="12"
+        placeholder="Current PIN" value="${forced ? '0000' : ''}">
+      <input id="newPin"  type="password" inputmode="numeric" maxlength="12" placeholder="New PIN (4+ digits)">
+      <input id="newPin2" type="password" inputmode="numeric" maxlength="12" placeholder="Confirm new PIN">
+      <button class="primary" id="savePin">Save PIN</button>
+      ${forced ? '' : '<button class="ghost" id="cancelPin">Cancel</button>'}
+    </div>`;
+  $('savePin').onclick = async ()=>{
+    const cur = $('curPin').value.trim(), n1 = $('newPin').value.trim(), n2 = $('newPin2').value.trim();
+    if(n1.length < 4){ toast('New PIN must be 4+ digits'); return; }
+    if(n1 !== n2){ toast("New PINs don't match"); return; }
+    try{
+      const { data, error } = await db.rpc('change_pin', { p_name:nick, p_old:cur, p_new:n1 });
+      if(error) throw error;
+      if(!data){ toast('Current PIN is wrong'); return; }
+    }catch(e){ console.error(e); toast("Couldn't change PIN"); return; }
+    lastPin = n1; p.innerHTML = ''; toast('✓ PIN updated');
+  };
+  const c = $('cancelPin'); if(c) c.onclick = ()=>{ p.innerHTML=''; };
 }
 
 /* ---------- load data ---------- */
@@ -190,9 +270,9 @@ function loadMyPicks(){
 
 /* ---------- predict tab ---------- */
 function renderPredict(){
-  const upcoming = matches.filter(m => !started(m));
+  const upcoming = matches.filter(m => !started(m) && !isGroup(m));
   const list = $('predictList');
-  if(!upcoming.length){ list.innerHTML = `<div class="empty">No upcoming games right now.<br>Check the Reveal tab for games already played.</div>`; return; }
+  if(!upcoming.length){ list.innerHTML = `<div class="empty">No picks open right now.<br>Group-stage picks are locked in. Knockout picks open once those fixtures are confirmed.</div>`; return; }
   list.innerHTML = upcoming.map(m => `
     <div class="match">
       <div class="stage"><span>${m.stage||''}</span><span class="ko">🔒 locks ${fmtKO(m.kickoff)}</span></div>
@@ -213,7 +293,7 @@ function renderPredict(){
 }
 
 async function savePicks(){
-  const upcoming = matches.filter(m=>!started(m)).map(m=>String(m.id));
+  const upcoming = matches.filter(m=>!started(m) && !isGroup(m)).map(m=>String(m.id));
   const rows = Object.entries(picks)
     .filter(([id,p]) => upcoming.includes(String(id)) && p)
     .map(([id,p]) => ({ player:nick, match_id:Number(id), pick:p }));
@@ -281,7 +361,7 @@ document.querySelectorAll('.tab').forEach(t=>{
 
 /* ---------- init ---------- */
 async function init(){
-  renderLogin();
+  await renderLogin();
   if(!nick) return;
   if(!configured){
     $('predictList').innerHTML = `<div class="err"><b>Not connected yet.</b><br>
