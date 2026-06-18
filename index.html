@@ -18,7 +18,23 @@
     background:linear-gradient(160deg,var(--bg),var(--bg2));
     color:var(--text); min-height:100vh; padding:24px 14px 60px;
   }
-  .wrap{max-width:760px;margin:0 auto}
+
+  /* ---- decorative background (globe + stadium glow) ---- */
+  .pitchbg{position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none}
+  .pitchbg .globe{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
+    width:min(125vh,150vw);height:auto;color:#9bf3c0;opacity:.08;
+    animation:spin 140s linear infinite}
+  .pitchbg .globe *{stroke:currentColor;fill:none;stroke-width:1.1;vector-effect:non-scaling-stroke}
+  /* stadium spotlight from the top */
+  .pitchbg::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(130% 60% at 50% -12%, rgba(120,255,180,.12), transparent 60%)}
+  /* vignette to focus the centre */
+  .pitchbg::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(125% 105% at 50% 38%, transparent 52%, rgba(0,0,0,.5))}
+  @keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.pitchbg .globe{animation:none}}
+
+  .wrap{max-width:760px;margin:0 auto;position:relative;z-index:1}
   h1{font-size:1.5rem;font-weight:800;letter-spacing:.02em;text-align:center}
   h1 .ball{filter:drop-shadow(0 2px 6px rgba(0,0,0,.4))}
   .sub{text-align:center;color:var(--muted);font-size:.82rem;margin-top:4px}
@@ -57,7 +73,8 @@
   .hint{color:var(--muted);font-size:.8rem;text-align:center;margin:8px 0 18px}
 
   /* match cards */
-  .match{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  .match{background:rgba(16,36,26,.72);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+    border:1px solid var(--line);border-radius:14px;
     padding:14px 16px;margin-bottom:12px}
   .match .stage{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;
     color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between}
@@ -82,7 +99,8 @@
   .pending{color:var(--muted);font-size:.78rem}
 
   /* leaderboard */
-  .lb{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .lb{background:rgba(16,36,26,.72);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+    border:1px solid var(--line);border-radius:14px;overflow:hidden}
   .lb .lrow{display:flex;justify-content:space-between;align-items:center;
     padding:13px 18px;border-bottom:1px solid var(--line)}
   .lb .lrow:last-child{border-bottom:none}
@@ -103,6 +121,19 @@
 </style>
 </head>
 <body>
+<div class="pitchbg" aria-hidden="true">
+  <svg class="globe" viewBox="0 0 600 600" fill="none">
+    <circle cx="300" cy="300" r="270"/>
+    <ellipse cx="300" cy="300" rx="175.5" ry="270"/>
+    <ellipse cx="300" cy="300" rx="70"   ry="270"/>
+    <line x1="300"   y1="30"    x2="300"   y2="570"/>
+    <line x1="30"    y1="300"   x2="570"   y2="300"/>
+    <line x1="52.5"  y1="192"   x2="547.5" y2="192"/>
+    <line x1="52.5"  y1="408"   x2="547.5" y2="408"/>
+    <line x1="121.4" y1="97.5"  x2="478.6" y2="97.5"/>
+    <line x1="121.4" y1="502.5" x2="478.6" y2="502.5"/>
+  </svg>
+</div>
 <div class="wrap">
   <h1><span class="ball">⚽</span> World&nbsp;Cup&nbsp;2026 Predictor</h1>
   <div class="sub">Pick every game. Nobody sees your call until kickoff.</div>
