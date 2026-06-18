@@ -8,120 +8,187 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0a1f14; --bg2:#0e2a1b; --grass:#2faf5a; --grass-d:#1c7d3f;
-    --card:#10241a; --line:rgba(255,255,255,.08); --text:#eafff0;
-    --muted:#8fb39c; --gold:#ffd34d; --red:#ff6b6b;
+    --bg:#04130c; --bg2:#072017;
+    --emerald:#2fd47a; --emerald-d:#159e51; --teal:#1fc7c0; --lime:#b6ff5c;
+    --gold:#ffd24a; --text:#eafff2; --muted:#7fa593;
+    --line:rgba(255,255,255,.09); --glass:rgba(12,30,21,.55); --red:#ff6b6b;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{
     font-family:'Inter',-apple-system,system-ui,sans-serif;
-    background:linear-gradient(160deg,var(--bg),var(--bg2));
-    color:var(--text); min-height:100vh; padding:24px 14px 60px;
+    background:radial-gradient(120% 90% at 50% -10%, #0b2c1d, var(--bg) 60%);
+    color:var(--text); min-height:100vh; padding:26px 14px 70px;
+    -webkit-font-smoothing:antialiased;
   }
 
-  /* ---- decorative background (globe + stadium glow) ---- */
+  /* ============ animated background ============ */
   .pitchbg{position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none}
-  .pitchbg .globe{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
-    width:min(125vh,150vw);height:auto;color:#9bf3c0;opacity:.08;
-    animation:spin 140s linear infinite}
+  .pitchbg .blob{position:absolute;border-radius:50%;filter:blur(72px);
+    opacity:.55;mix-blend-mode:screen;will-change:transform}
+  .pitchbg .b1{width:58vmax;height:58vmax;left:-16vmax;top:-22vmax;
+    background:radial-gradient(circle,#1aa75a,transparent 62%);animation:drift1 30s ease-in-out infinite}
+  .pitchbg .b2{width:52vmax;height:52vmax;right:-18vmax;top:2vmax;
+    background:radial-gradient(circle,#10b6ac,transparent 62%);animation:drift2 36s ease-in-out infinite}
+  .pitchbg .b3{width:46vmax;height:46vmax;left:18vmax;bottom:-24vmax;
+    background:radial-gradient(circle,#b59021,transparent 62%);animation:drift3 42s ease-in-out infinite}
+  .pitchbg .globe{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);
+    width:min(118vh,142vw);height:auto;color:#a6ffce;opacity:.07;
+    filter:drop-shadow(0 0 40px rgba(47,212,122,.25));animation:spin 160s linear infinite}
   .pitchbg .globe *{stroke:currentColor;fill:none;stroke-width:1.1;vector-effect:non-scaling-stroke}
-  /* stadium spotlight from the top */
+  .pitchbg .grain{position:absolute;inset:0;opacity:.045;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
   .pitchbg::before{content:"";position:absolute;inset:0;
-    background:radial-gradient(130% 60% at 50% -12%, rgba(120,255,180,.12), transparent 60%)}
-  /* vignette to focus the centre */
+    background:radial-gradient(130% 60% at 50% -12%, rgba(120,255,180,.14), transparent 58%)}
   .pitchbg::after{content:"";position:absolute;inset:0;
-    background:radial-gradient(125% 105% at 50% 38%, transparent 52%, rgba(0,0,0,.5))}
+    background:radial-gradient(125% 105% at 50% 40%, transparent 50%, rgba(0,0,0,.58))}
   @keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
-  @media (prefers-reduced-motion:reduce){.pitchbg .globe{animation:none}}
+  @keyframes drift1{50%{transform:translate(8vmax,6vmax) scale(1.1)}}
+  @keyframes drift2{50%{transform:translate(-7vmax,5vmax) scale(1.08)}}
+  @keyframes drift3{50%{transform:translate(5vmax,-7vmax) scale(1.12)}}
+  @keyframes shimmer{to{background-position:220% center}}
+  @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    .pitchbg .globe,.pitchbg .blob,.title,.match{animation:none!important}
+  }
 
-  .wrap{max-width:760px;margin:0 auto;position:relative;z-index:1}
-  h1{font-size:1.5rem;font-weight:800;letter-spacing:.02em;text-align:center}
-  h1 .ball{filter:drop-shadow(0 2px 6px rgba(0,0,0,.4))}
-  .sub{text-align:center;color:var(--muted);font-size:.82rem;margin-top:4px}
+  .wrap{max-width:720px;margin:0 auto;position:relative;z-index:1}
+
+  /* ============ hero ============ */
+  .hero{text-align:center;margin-bottom:6px}
+  .kicker{display:inline-flex;align-items:center;gap:7px;font-size:.66rem;font-weight:700;
+    letter-spacing:.22em;text-transform:uppercase;color:var(--muted);
+    padding:6px 14px;border:1px solid var(--line);border-radius:999px;
+    background:var(--glass);backdrop-filter:blur(8px);margin-bottom:14px}
+  .kicker .dot{width:6px;height:6px;border-radius:50%;background:var(--emerald);
+    box-shadow:0 0 10px var(--emerald)}
+  .title{font-size:clamp(2rem,8vw,3rem);font-weight:800;letter-spacing:-.025em;line-height:1.02;
+    background:linear-gradient(100deg,#eafff2,#9bffc6 28%,#ffe88a 52%,#9bffc6 74%,#eafff2);
+    background-size:220% auto;-webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:shimmer 7s linear infinite;filter:drop-shadow(0 3px 24px rgba(47,212,122,.22))}
+  .sub{color:var(--muted);font-size:.86rem;margin-top:10px}
+
+  /* ============ controls ============ */
+  button{font:inherit;cursor:pointer;border:none;border-radius:12px;
+    padding:11px 18px;font-weight:600;transition:transform .18s,box-shadow .2s,background .2s,border-color .2s}
+  .primary{background:linear-gradient(180deg,var(--emerald),var(--emerald-d));color:#042611;
+    box-shadow:0 8px 22px rgba(47,212,122,.32)}
+  .primary:hover{transform:translateY(-1px);box-shadow:0 12px 30px rgba(47,212,122,.46)}
+  .primary:active{transform:translateY(0)}
+  .ghost{background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--line)}
+  .ghost:hover{border-color:var(--emerald);background:rgba(47,212,122,.1)}
+  input,select{font:inherit;color:var(--text);background:rgba(0,0,0,.28);
+    border:1px solid var(--line);border-radius:12px;padding:11px 14px;transition:.2s}
+  input:focus,select:focus{outline:none;border-color:var(--emerald);
+    box-shadow:0 0 0 3px rgba(47,212,122,.2)}
 
   /* login bar */
   .login{display:flex;gap:8px;align-items:center;justify-content:center;
-    margin:20px auto;flex-wrap:wrap}
-  .login input,.login select{padding:10px 14px;border-radius:10px;border:1px solid var(--line);
-    background:#0c1d14;color:var(--text);font:inherit}
-  .login select{min-width:200px;cursor:pointer}
-  .login input{min-width:120px}
-  .login .who{font-weight:700;color:var(--grass)}
+    margin:22px auto;flex-wrap:wrap}
+  .login select{min-width:190px;cursor:pointer}
+  .login input{min-width:110px}
+  .login .who{font-weight:700;color:var(--emerald)}
 
   /* change-PIN panel */
-  #pinPanel{max-width:340px;margin:0 auto}
-  #pinPanel .card2{background:var(--card);border:1px solid var(--line);
-    border-radius:14px;padding:16px;margin:12px auto}
-  #pinPanel h3{font-size:.9rem;margin-bottom:6px}
-  #pinPanel input{width:100%;margin-bottom:8px;padding:10px 12px;border-radius:10px;
-    border:1px solid var(--line);background:#0c1d14;color:var(--text);font:inherit}
+  #pinPanel{max-width:360px;margin:0 auto}
+  #pinPanel .card2{background:var(--glass);backdrop-filter:blur(16px);
+    border:1px solid var(--line);border-radius:18px;padding:18px;margin:14px auto;
+    box-shadow:0 18px 50px rgba(0,0,0,.4)}
+  #pinPanel h3{font-size:1rem;margin-bottom:6px;font-weight:700}
+  #pinPanel input{width:100%;margin-bottom:9px}
   #pinPanel button{width:100%}
   #pinPanel .ghost{margin-top:6px}
-  button{font:inherit;cursor:pointer;border:none;border-radius:10px;
-    padding:10px 16px;font-weight:600}
-  .primary{background:linear-gradient(180deg,var(--grass),var(--grass-d));color:#06210f}
-  .ghost{background:#0c1d14;color:var(--text);border:1px solid var(--line)}
-  .primary:hover{filter:brightness(1.08)} .ghost:hover{border-color:var(--grass)}
 
-  /* tabs */
-  .tabs{display:flex;gap:6px;justify-content:center;margin:22px 0 18px}
-  .tab{background:transparent;color:var(--muted);border:1px solid var(--line);
-    padding:9px 16px;border-radius:999px;font-size:.85rem}
-  .tab.active{background:var(--grass);color:#06210f;border-color:var(--grass)}
+  /* ============ tabs (segmented) ============ */
+  .tabs{display:flex;gap:4px;justify-content:center;margin:26px auto 22px;padding:5px;
+    width:fit-content;max-width:100%;background:var(--glass);border:1px solid var(--line);
+    border-radius:999px;backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,.28)}
+  .tab{background:transparent;color:var(--muted);border:none;padding:9px 17px;border-radius:999px;
+    font-size:.85rem;font-weight:600;white-space:nowrap}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:#042611;background:linear-gradient(180deg,var(--emerald),var(--emerald-d));
+    box-shadow:0 4px 16px rgba(47,212,122,.45)}
 
-  .panel{display:none} .panel.show{display:block}
-  .hint{color:var(--muted);font-size:.8rem;text-align:center;margin:8px 0 18px}
+  .panel{display:none;animation:rise .4s ease both} .panel.show{display:block}
+  .hint{color:var(--muted);font-size:.8rem;text-align:center;margin:8px auto 18px;max-width:560px;line-height:1.5}
 
-  /* match cards */
-  .match{background:rgba(16,36,26,.72);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
-    border:1px solid var(--line);border-radius:14px;
-    padding:14px 16px;margin-bottom:12px}
-  .match .stage{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;
-    color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between}
-  .match .teams{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.02rem}
-  .match .teams .vs{color:var(--muted);font-weight:500;font-size:.8rem}
+  /* ============ match cards ============ */
+  .match{position:relative;background:var(--glass);
+    backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);
+    border:1px solid var(--line);border-radius:18px;padding:16px 18px;margin-bottom:14px;
+    box-shadow:0 12px 32px rgba(0,0,0,.26);overflow:hidden;animation:rise .5s ease both}
+  .match::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent)}
+  .match:nth-child(2){animation-delay:.04s}.match:nth-child(3){animation-delay:.08s}
+  .match:nth-child(4){animation-delay:.12s}.match:nth-child(5){animation-delay:.16s}
+  .match:hover{border-color:rgba(47,212,122,.3)}
+  .match .stage{font-size:.64rem;text-transform:uppercase;letter-spacing:.14em;
+    color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;gap:8px}
+  .match .teams{display:flex;align-items:center;gap:11px;font-weight:700;font-size:1.06rem}
+  .match .teams .vs{color:var(--muted);font-weight:600;font-size:.7rem;text-transform:uppercase;
+    letter-spacing:.08em;padding:3px 8px;border:1px solid var(--line);border-radius:999px}
   .match .ko{color:var(--muted);font-size:.74rem;font-weight:500}
-  .match select{width:100%;margin-top:11px;padding:11px 12px;border-radius:10px;
-    border:1px solid var(--line);background:#0c1d14;color:var(--text);font:inherit;cursor:pointer}
+  .match select{width:100%;margin-top:12px;cursor:pointer}
   .match.locked select{opacity:.55;pointer-events:none}
   .lockmsg{font-size:.72rem;color:var(--gold);margin-top:8px}
 
-  /* reveal grid */
-  .reveal .row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;
-    padding:8px 0;border-bottom:1px solid var(--line)}
-  .reveal .picks{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-  .chip{font-size:.74rem;padding:4px 9px;border-radius:999px;background:#0c1d14;
-    border:1px solid var(--line)}
-  .chip b{color:var(--grass)}
-  .chip.hit{border-color:var(--grass);background:rgba(47,175,90,.16)}
-  .chip.miss{opacity:.6}
-  .result{font-weight:700;color:var(--gold);font-size:.85rem}
+  /* ============ reveal ============ */
+  .reveal .row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;
+    gap:4px 12px;padding:2px 0 10px}
+  .reveal .teams{flex:1 1 auto;min-width:0}
+  .result{white-space:nowrap}
+  .reveal .picks{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;
+    padding-top:12px;border-top:1px solid var(--line)}
+  .chip{font-size:.74rem;padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.05);
+    border:1px solid var(--line);transition:.2s}
+  .chip b{color:var(--text);font-weight:700}
+  .chip.hit{border-color:rgba(47,212,122,.5);background:rgba(47,212,122,.16);color:#d7ffe6}
+  .chip.hit b{color:var(--lime)}
+  .chip.miss{opacity:.45}
+  .result{font-weight:800;color:var(--gold);font-size:.9rem;font-variant-numeric:tabular-nums}
   .pending{color:var(--muted);font-size:.78rem}
 
-  /* leaderboard */
-  .lb{background:rgba(16,36,26,.72);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
-    border:1px solid var(--line);border-radius:14px;overflow:hidden}
-  .lb .lrow{display:flex;justify-content:space-between;align-items:center;
-    padding:13px 18px;border-bottom:1px solid var(--line)}
+  /* ============ leaderboard ============ */
+  .lb{background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.3)}
+  .lb .lrow{display:flex;align-items:center;gap:14px;padding:15px 18px;
+    border-bottom:1px solid var(--line);transition:background .2s}
   .lb .lrow:last-child{border-bottom:none}
-  .lb .rank{color:var(--muted);width:26px;font-weight:700}
-  .lb .name{flex:1;font-weight:600}
-  .lb .pts{font-weight:800;color:var(--grass);font-variant-numeric:tabular-nums}
-  .lb .lrow.me{background:rgba(47,175,90,.08)}
+  .lb .lrow:hover{background:rgba(255,255,255,.03)}
+  .lb .medal{font-size:1.35rem;width:30px;text-align:center;flex:none;
+    filter:drop-shadow(0 2px 6px rgba(0,0,0,.4))}
+  .lb .rank{color:var(--muted);width:30px;text-align:center;font-weight:800;flex:none;
+    font-variant-numeric:tabular-nums}
+  .lb .info{flex:1;min-width:0}
+  .lb .name{font-weight:700;display:block;margin-bottom:7px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lb .bar{height:6px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+  .lb .bar i{display:block;height:100%;border-radius:999px;
+    background:linear-gradient(90deg,var(--emerald),var(--lime));
+    transition:width .9s cubic-bezier(.2,.8,.2,1)}
+  .lb .pts{font-weight:800;font-size:1.1rem;color:var(--emerald);flex:none;
+    font-variant-numeric:tabular-nums}
+  .lb .pts small{font-size:.66rem;color:var(--muted);font-weight:600;margin-left:2px}
+  .lb .rank-1 .bar i{background:linear-gradient(90deg,#ffd24a,#ffae1f)}
+  .lb .rank-1 .pts{color:var(--gold)}
+  .lb .me{background:rgba(47,212,122,.09);box-shadow:inset 3px 0 0 var(--emerald)}
 
-  .save{position:sticky;bottom:14px;margin-top:10px;width:100%;padding:15px;
-    font-size:1rem;letter-spacing:.04em}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
-    background:var(--grass);color:#06210f;padding:11px 18px;border-radius:10px;
-    font-weight:700;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50}
-  .toast.show{opacity:1}
-  .empty{text-align:center;color:var(--muted);padding:40px 10px}
+  .save{position:sticky;bottom:14px;margin-top:12px;width:100%;padding:16px;
+    font-size:1rem;letter-spacing:.03em}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);
+    background:linear-gradient(180deg,var(--emerald),var(--emerald-d));color:#042611;
+    padding:12px 20px;border-radius:12px;font-weight:700;opacity:0;pointer-events:none;z-index:50;
+    box-shadow:0 12px 32px rgba(47,212,122,.4);transition:opacity .25s,transform .25s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .empty{text-align:center;color:var(--muted);padding:46px 16px;line-height:1.6}
   .err{background:rgba(255,107,107,.12);border:1px solid var(--red);color:#ffd9d9;
-    border-radius:10px;padding:12px 14px;font-size:.82rem;margin:14px 0}
+    border-radius:14px;padding:14px 16px;font-size:.82rem;margin:14px 0}
 </style>
 </head>
 <body>
 <div class="pitchbg" aria-hidden="true">
+  <span class="blob b1"></span>
+  <span class="blob b2"></span>
+  <span class="blob b3"></span>
   <svg class="globe" viewBox="0 0 600 600" fill="none">
     <circle cx="300" cy="300" r="270"/>
     <ellipse cx="300" cy="300" rx="175.5" ry="270"/>
@@ -133,10 +200,14 @@
     <line x1="121.4" y1="97.5"  x2="478.6" y2="97.5"/>
     <line x1="121.4" y1="502.5" x2="478.6" y2="502.5"/>
   </svg>
+  <span class="grain"></span>
 </div>
 <div class="wrap">
-  <h1><span class="ball">⚽</span> World&nbsp;Cup&nbsp;2026 Predictor</h1>
-  <div class="sub">Pick every game. Nobody sees your call until kickoff.</div>
+  <header class="hero">
+    <div class="kicker"><span class="dot"></span> ⚽ Predictor League · 2026</div>
+    <h1 class="title">World Cup 2026</h1>
+    <div class="sub">Pick every game. Nobody sees your call until kickoff.</div>
+  </header>
 
   <div class="login" id="loginBar"></div>
   <div id="pinPanel"></div>
@@ -372,13 +443,22 @@ function renderBoard(){
   revealed.forEach(r=>{ if(!(r.player in scores)) scores[r.player]=0; });
   const ranked = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
   const list = $('boardList');
-  if(!ranked.length){ list.innerHTML = `<div class="empty">No results scored yet. Standings appear once final scores are entered.</div>`; return; }
-  list.innerHTML = `<div class="lb">` + ranked.map(([name,pts],i)=>`
-    <div class="lrow ${name===nick?'me':''}">
-      <span class="rank">${i+1}</span>
-      <span class="name">${name}</span>
-      <span class="pts">${pts} pt${pts===1?'':'s'}</span>
-    </div>`).join('') + `</div>`;
+  if(!ranked.length){ list.innerHTML = `<div class="empty">No results scored yet.<br>Standings appear once final scores are entered.</div>`; return; }
+  const max = Math.max(1, ranked[0][1]);
+  const MEDAL = ['🥇','🥈','🥉'];
+  list.innerHTML = `<div class="lb">` + ranked.map(([name,pts],i)=>{
+    const lead = i<3 && pts>0 ? `<span class="medal">${MEDAL[i]}</span>`
+                              : `<span class="rank">${i+1}</span>`;
+    const pct = Math.max(pts>0?6:0, Math.round(pts/max*100));
+    return `<div class="lrow rank-${i+1} ${name===nick?'me':''}">
+      ${lead}
+      <div class="info">
+        <span class="name">${name}</span>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+      </div>
+      <span class="pts">${pts}<small>pt${pts===1?'':'s'}</small></span>
+    </div>`;
+  }).join('') + `</div>`;
 }
 
 /* ---------- tabs ---------- */
