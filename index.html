@@ -116,13 +116,14 @@
     backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);
     border:1px solid var(--line);border-radius:18px;padding:16px 18px;margin-bottom:14px;
     box-shadow:0 12px 32px rgba(0,0,0,.26);overflow:hidden;animation:rise .5s ease both}
-  .match::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;
-    background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent)}
+  .match::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,var(--accent,#2fd47a),transparent);opacity:.75}
   .match:nth-child(2){animation-delay:.04s}.match:nth-child(3){animation-delay:.08s}
   .match:nth-child(4){animation-delay:.12s}.match:nth-child(5){animation-delay:.16s}
   .match:hover{border-color:rgba(47,212,122,.3)}
   .match .stage{font-size:.64rem;text-transform:uppercase;letter-spacing:.14em;
     color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;gap:8px}
+  .match .stage .st{color:var(--accent,var(--muted));font-weight:700}
   .match .teams{display:flex;align-items:center;gap:11px;font-weight:700;font-size:1.06rem}
   .match .teams .vs{color:var(--muted);font-weight:600;font-size:.7rem;text-transform:uppercase;
     letter-spacing:.08em;padding:3px 8px;border:1px solid var(--line);border-radius:999px}
@@ -182,6 +183,23 @@
   .empty{text-align:center;color:var(--muted);padding:46px 16px;line-height:1.6}
   .err{background:rgba(255,107,107,.12);border:1px solid var(--red);color:#ffd9d9;
     border-radius:14px;padding:14px 16px;font-size:.82rem;margin:14px 0}
+
+  /* ============ flag ribbon ============ */
+  .flags{margin:16px -14px 2px;overflow:hidden;
+    -webkit-mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
+    mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+  .flags .track{display:inline-flex;gap:16px;font-size:1.3rem;white-space:nowrap;
+    animation:marquee 55s linear infinite;will-change:transform}
+  .flags:hover .track{animation-play-state:paused}
+  @keyframes marquee{to{transform:translateX(-50%)}}
+
+  /* ============ confetti ============ */
+  .confetti{position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden}
+  .confetti i{position:absolute;top:-14px;border-radius:2px;opacity:.92;animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(112vh) rotate(720deg);opacity:.85}}
+  @media (prefers-reduced-motion:reduce){
+    .flags .track{animation:none}.confetti{display:none}
+  }
 </style>
 </head>
 <body>
@@ -207,6 +225,7 @@
     <div class="kicker"><span class="dot"></span> ⚽ Predictor League · 2026</div>
     <h1 class="title">World Cup 2026</h1>
     <div class="sub">Pick every game. Nobody sees your call until kickoff.</div>
+    <div class="flags" aria-hidden="true"><div class="track" id="flagTrack"></div></div>
   </header>
 
   <div class="login" id="loginBar"></div>
@@ -269,6 +288,52 @@ const started = m => new Date(m.kickoff) <= new Date();
 const isGroup = m => (m.stage||'').toLowerCase().startsWith('group');
 const outcome = m => (m.home_score==null||m.away_score==null) ? null
   : m.home_score>m.away_score ? 'H' : m.home_score<m.away_score ? 'A' : 'D';
+
+// per-stage accent colour: groups→emerald, R16→teal, QF→blue, SF→purple, 3rd→orange, final→gold
+const stageAccent = stage => {
+  const s = (stage||'').toLowerCase();
+  if(s.includes('third')) return '#ff9f6b';
+  if(s.includes('final') && !s.includes('semi') && !s.includes('quarter')) return '#ffd24a';
+  if(s.includes('semi')) return '#c084fc';
+  if(s.includes('quarter')) return '#5b9cff';
+  if(s.includes('16') || s.includes('round')) return '#1fc7c0';
+  return '#2fd47a';
+};
+
+// leader-change confetti
+let pendingConfetti = false;
+function fireConfetti(){
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  const colors = ['#ffd24a','#2fd47a','#1fc7c0','#ff6b6b','#b6ff5c','#ffffff'];
+  const box = document.createElement('div'); box.className = 'confetti';
+  for(let i=0;i<90;i++){
+    const p = document.createElement('i');
+    p.style.left = Math.random()*100 + 'vw';
+    p.style.background = colors[i % colors.length];
+    const sz = 6 + Math.random()*7; p.style.width = p.style.height = sz + 'px';
+    p.style.animationDelay = (Math.random()*0.5) + 's';
+    p.style.animationDuration = (2.2 + Math.random()*1.8) + 's';
+    box.appendChild(p);
+  }
+  document.body.appendChild(box);
+  setTimeout(()=>box.remove(), 4500);
+}
+function maybeConfetti(){
+  if(pendingConfetti && $('board') && $('board').classList.contains('show')){
+    pendingConfetti = false; fireConfetti();
+  }
+}
+
+// scrolling flag ribbon in the header (duplicated for a seamless -50% loop)
+const FLAGS = ['🇦🇷','🇧🇷','🇫🇷','🇩🇪','🇪🇸','🇵🇹','🇳🇱','🇧🇪','🇭🇷','🇺🇸','🇲🇽','🇨🇦',
+  '🇯🇵','🇰🇷','🇲🇦','🇸🇳','🇨🇮','🇬🇭','🇪🇬','🇩🇿','🇨🇭','🇦🇹','🇸🇪','🇳🇴','🇺🇾','🇨🇴',
+  '🇮🇷','🇶🇦','🇸🇦','🇦🇺','🇳🇿','🇨🇿','🇨🇼','🇵🇾','🇮🇶','🇯🇴','🇵🇦','🇺🇿','🇨🇩','🇭🇹',
+  '🇧🇦','🇨🇻','🇹🇳','🇿🇦'];
+(function fillFlags(){
+  const t = $('flagTrack'); if(!t) return;
+  const one = FLAGS.map(f=>`<span>${f}</span>`).join('');
+  t.innerHTML = one + one;
+})();
 
 /* ---------- login ---------- */
 async function renderLogin(){
@@ -376,8 +441,8 @@ function renderPredict(){
   const list = $('predictList');
   if(!upcoming.length){ list.innerHTML = `<div class="empty">No picks open right now.<br>Group-stage picks are locked in. Knockout picks open once those fixtures are confirmed.</div>`; return; }
   list.innerHTML = upcoming.map(m => `
-    <div class="match">
-      <div class="stage"><span>${m.stage||''}</span><span class="ko">🔒 locks ${fmtKO(m.kickoff)}</span></div>
+    <div class="match" style="--accent:${stageAccent(m.stage)}">
+      <div class="stage"><span class="st">${m.stage||''}</span><span class="ko">🔒 locks ${fmtKO(m.kickoff)}</span></div>
       <div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>
       <select data-id="${m.id}">
         <option value="">— pick a result —</option>
@@ -422,8 +487,8 @@ function renderReveal(){
     const scoreLine = res
       ? `<span class="result">${m.home_score}–${m.away_score} · ${PICK_LABEL[res]}</span>`
       : `<span class="pending">awaiting result</span>`;
-    return `<div class="match reveal">
-      <div class="stage"><span>${m.stage||''}</span><span class="ko">${fmtKO(m.kickoff)}</span></div>
+    return `<div class="match reveal" style="--accent:${stageAccent(m.stage)}">
+      <div class="stage"><span class="st">${m.stage||''}</span><span class="ko">${fmtKO(m.kickoff)}</span></div>
       <div class="row"><div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>${scoreLine}</div>
       <div class="picks">${chips}</div>
     </div>`;
@@ -454,11 +519,29 @@ function renderBoard(){
       ${lead}
       <div class="info">
         <span class="name">${name}</span>
-        <div class="bar"><i style="width:${pct}%"></i></div>
+        <div class="bar"><i data-w="${pct}" style="width:0%"></i></div>
       </div>
-      <span class="pts">${pts}<small>pt${pts===1?'':'s'}</small></span>
+      <span class="pts"><span class="n" data-to="${pts}">0</span><small>pt${pts===1?'':'s'}</small></span>
     </div>`;
   }).join('') + `</div>`;
+
+  // animate the bars filling + the points counting up
+  requestAnimationFrame(()=>{
+    list.querySelectorAll('.bar i').forEach(el=>{ el.style.width = el.dataset.w + '%'; });
+    list.querySelectorAll('.n').forEach(el=>{
+      const to = +el.dataset.to, dur = 750, t0 = performance.now();
+      const step = now => { const k = Math.min(1,(now-t0)/dur);
+        el.textContent = Math.round(k*to); if(k<1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    });
+  });
+
+  // pop confetti if the leader has changed since last time (and they actually have points)
+  const leader = ranked[0][0], topPts = ranked[0][1];
+  const prev = localStorage.getItem('wc_leader');
+  if(prev && prev !== leader && topPts > 0) pendingConfetti = true;
+  localStorage.setItem('wc_leader', leader);
+  maybeConfetti();
 }
 
 /* ---------- tabs ---------- */
@@ -467,6 +550,7 @@ document.querySelectorAll('.tab').forEach(t=>{
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(x=>x.classList.remove('show'));
     t.classList.add('active'); $(t.dataset.tab).classList.add('show');
+    if(t.dataset.tab === 'board') maybeConfetti();
   };
 });
 
