@@ -101,7 +101,9 @@
   /* ============ tabs (segmented) ============ */
   .tabs{display:flex;gap:4px;justify-content:center;margin:26px auto 22px;padding:5px;
     width:fit-content;max-width:100%;background:var(--glass);border:1px solid var(--line);
-    border-radius:999px;backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,.28)}
+    border-radius:999px;backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,.28);
+    overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .tabs::-webkit-scrollbar{display:none}
   .tab{background:transparent;color:var(--muted);border:none;padding:9px 17px;border-radius:999px;
     font-size:.85rem;font-weight:600;white-space:nowrap}
   .tab:hover{color:var(--text)}
@@ -184,6 +186,19 @@
   .err{background:rgba(255,107,107,.12);border:1px solid var(--red);color:#ffd9d9;
     border-radius:14px;padding:14px 16px;font-size:.82rem;margin:14px 0}
 
+  /* ============ qualify-odds model ============ */
+  .qhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+  .qhead .gname{font-weight:800;font-size:1.02rem}
+  .qhead .gtag{font-size:.6rem;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
+  .qrow{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .qrow:last-child{border-bottom:none}
+  .qrow .qn{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qrow .qmeta{color:var(--muted);font-size:.7rem;font-weight:500;margin-left:7px}
+  .qbar{width:78px;height:6px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden;flex:none}
+  .qbar i{display:block;height:100%;border-radius:999px;transition:width .9s cubic-bezier(.2,.8,.2,1)}
+  .qpct{width:42px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;flex:none;font-size:.92rem}
+  .qrow.q-out{opacity:.6}
+
   /* ============ flag ribbon ============ */
   .flags{margin:16px -14px 2px;overflow:hidden;
     -webkit-mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
@@ -233,9 +248,10 @@
 
   <div id="app" style="display:none">
     <div class="tabs">
-      <button class="tab active" data-tab="predict">Make Picks</button>
+      <button class="tab active" data-tab="predict">Picks</button>
       <button class="tab" data-tab="reveal">Reveal</button>
       <button class="tab" data-tab="board">Leaderboard</button>
+      <button class="tab" data-tab="model">Odds</button>
     </div>
 
     <div class="panel show" id="predict">
@@ -251,6 +267,11 @@
     <div class="panel" id="board">
       <div class="hint">+1 point for every correct result, once the final score is entered.</div>
       <div id="boardList"></div>
+    </div>
+
+    <div class="panel" id="model">
+      <div class="hint">A Monte-Carlo model (5,000 simulations) rates each team on results so far and plays out the remaining group games. Top 2 of every group + the 8 best third-placed teams reach the knockouts. Updates automatically as real scores land.</div>
+      <div id="modelList"></div>
     </div>
   </div>
 </div>
@@ -544,6 +565,82 @@ function renderBoard(){
   maybeConfetti();
 }
 
+/* ---------- qualification model (Monte-Carlo) ---------- */
+function renderModel(){
+  const list = $('modelList'); if(!list) return;
+  const groupMs = {};
+  matches.forEach(m=>{ if(!isGroup(m)) return; (groupMs[m.stage] = groupMs[m.stage]||[]).push(m); });
+  const gnames = Object.keys(groupMs).sort();
+  if(!gnames.length){ list.innerHTML = `<div class="empty">No group fixtures loaded yet.</div>`; return; }
+
+  // team attack/defence ratings from finished games (shrunk toward the league average)
+  const gf={}, ga={}, gp={}; let tg=0, tm=0;
+  matches.forEach(m=>{ if(!isGroup(m)||m.home_score==null||m.away_score==null) return;
+    gf[m.home_team]=(gf[m.home_team]||0)+m.home_score; ga[m.home_team]=(ga[m.home_team]||0)+m.away_score; gp[m.home_team]=(gp[m.home_team]||0)+1;
+    gf[m.away_team]=(gf[m.away_team]||0)+m.away_score; ga[m.away_team]=(ga[m.away_team]||0)+m.home_score; gp[m.away_team]=(gp[m.away_team]||0)+1;
+    tg+=m.home_score+m.away_score; tm++; });
+  const lg = tm ? tg/(2*tm) : 1.3, PR = 1.6, HOME = 1.08;
+  const atk = t => ((gf[t]||0)+PR*lg)/(((gp[t]||0)+PR)*lg);
+  const def = t => ((ga[t]||0)+PR*lg)/(((gp[t]||0)+PR)*lg);
+  const pois = l => { let L=Math.exp(-l), k=0, p=1; do{ k++; p*=Math.random(); }while(p>L); return k-1; };
+
+  // current standings (base) + the games still to play, per group
+  const base={}, rem={}, teams={};
+  gnames.forEach(g=>{ base[g]={}; rem[g]=[];
+    groupMs[g].forEach(m=>{ [m.home_team,m.away_team].forEach(t=>{
+      if(!base[g][t]){ base[g][t]={pts:0,gd:0,gf:0,pld:0}; teams[t]=g; } }); });
+    groupMs[g].forEach(m=>{
+      if(m.home_score!=null && m.away_score!=null){ const T=base[g];
+        T[m.home_team].pld++; T[m.away_team].pld++;
+        T[m.home_team].gf+=m.home_score; T[m.away_team].gf+=m.away_score;
+        T[m.home_team].gd+=m.home_score-m.away_score; T[m.away_team].gd+=m.away_score-m.home_score;
+        if(m.home_score>m.away_score) T[m.home_team].pts+=3;
+        else if(m.away_score>m.home_score) T[m.away_team].pts+=3;
+        else { T[m.home_team].pts++; T[m.away_team].pts++; }
+      } else rem[g].push(m);
+    });
+  });
+
+  // simulate
+  const N=5000, adv={};
+  Object.keys(teams).forEach(t=>adv[t]=0);
+  for(let s=0;s<N;s++){
+    const thirds=[];
+    gnames.forEach(g=>{
+      const T={}; for(const t in base[g]) T[t]={...base[g][t]};
+      rem[g].forEach(m=>{ const h=m.home_team, a=m.away_team;
+        const gh=pois(lg*atk(h)*def(a)*HOME), gv=pois(lg*atk(a)*def(h)/HOME);
+        T[h].gf+=gh; T[a].gf+=gv; T[h].gd+=gh-gv; T[a].gd+=gv-gh;
+        if(gh>gv) T[h].pts+=3; else if(gv>gh) T[a].pts+=3; else { T[h].pts++; T[a].pts++; }
+      });
+      const arr=Object.entries(T).map(([t,v])=>({t,...v,r:Math.random()}));
+      arr.sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf || x.r-y.r);
+      adv[arr[0].t]++; adv[arr[1].t]++;   // top 2 advance
+      thirds.push(arr[2]);                // 3rd place into the best-thirds pool
+    });
+    thirds.sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf || x.r-y.r);
+    for(let i=0;i<8 && i<thirds.length;i++) adv[thirds[i].t]++;   // 8 best thirds advance
+  }
+
+  list.innerHTML = gnames.map(g=>{
+    const rows = Object.keys(base[g]).map(t=>({t, pld:base[g][t].pld, pts:base[g][t].pts, adv:adv[t]/N}))
+      .sort((a,b)=> b.adv-a.adv || b.pts-a.pts);
+    return `<div class="match" style="--accent:#2fd47a">
+      <div class="qhead"><span class="gname">${g}</span><span class="gtag">chance to advance</span></div>
+      ${rows.map(r=>{
+        const pc = Math.round(r.adv*100);
+        const col = pc>=65?'var(--emerald)':pc>=35?'var(--gold)':'var(--muted)';
+        return `<div class="qrow ${pc<15?'q-out':''}">
+          <span class="qn">${r.t}<span class="qmeta">${r.pts} pt · ${r.pld} pld</span></span>
+          <span class="qbar"><i data-w="${pc}" style="width:0%;background:${col}"></i></span>
+          <span class="qpct" style="color:${col}">${pc}%</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+  requestAnimationFrame(()=>{ list.querySelectorAll('.qbar i').forEach(el=>{ el.style.width=el.dataset.w+'%'; }); });
+}
+
 /* ---------- tabs ---------- */
 document.querySelectorAll('.tab').forEach(t=>{
   t.onclick = ()=>{
@@ -566,7 +663,7 @@ async function init(){
   loadMyPicks();
   try{
     await Promise.all([loadMatches(), loadRevealed()]);
-    renderPredict(); renderReveal(); renderBoard();
+    renderPredict(); renderReveal(); renderBoard(); renderModel();
   }catch(e){
     console.error(e);
     $('predictList').innerHTML = `<div class="err"><b>Couldn't reach the database.</b><br>
