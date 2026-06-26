@@ -4,3 +4,4 @@ load-group-picks.sql
 picks-*.csv
 # The source spreadsheet of everyone's picks — also secret, keep out of the public repo.
 *.xlsx
+supabase/.temp/

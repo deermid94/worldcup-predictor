@@ -199,6 +199,53 @@
   .qpct{width:42px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;flex:none;font-size:.92rem}
   .qrow.q-out{opacity:.6}
 
+  /* ============ knockout bracket ============ */
+  .bk-legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;
+    color:var(--muted);font-size:.72rem;margin:0 0 16px}
+  .bk-legend b{color:var(--text);font-weight:700}
+  .bk-stage{display:flex;align-items:center;gap:10px;margin:22px 2px 12px;
+    font-size:.74rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .bk-stage::before,.bk-stage::after{content:"";height:1px;flex:1;background:var(--line)}
+  .bkmatch{position:relative;background:var(--glass);
+    backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);
+    border:1px solid var(--line);border-radius:16px;padding:13px 15px;margin-bottom:11px;
+    box-shadow:0 10px 26px rgba(0,0,0,.24);overflow:hidden;animation:rise .5s ease both}
+  .bkmatch::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,var(--accent,#2fd47a),transparent);opacity:.7}
+  .bk-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px;
+    font-size:.6rem;text-transform:uppercase;letter-spacing:.13em;color:var(--muted)}
+  .bk-tag{font-weight:700;font-size:.62rem;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .bk-tag.ok{color:#d7ffe6;background:rgba(47,212,122,.16);border:1px solid rgba(47,212,122,.5)}
+  .bk-tag.proj{color:#ffe9b8;background:rgba(255,210,74,.13);border:1px solid rgba(255,210,74,.4)}
+  .bk-team{display:flex;align-items:center;gap:9px;padding:5px 0;font-weight:700;font-size:1.02rem}
+  .bk-team .fl{font-size:1.15rem;flex:none;width:1.4em;text-align:center}
+  .bk-team .tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bk-team .sc{font-variant-numeric:tabular-nums;font-weight:800;color:var(--gold);flex:none}
+  .bk-team.tbd{opacity:.5;font-style:italic;font-weight:600}
+  .bk-team.win .tn{color:var(--lime)}
+  .bk-team.win::after{content:"▸";color:var(--emerald);font-size:.8rem;margin-left:2px}
+  .bk-team.proj .tn{color:var(--text);opacity:.82}
+  .bk-mid{display:flex;align-items:center;gap:8px;margin:1px 0}
+  .bk-mid .vs{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .bk-mid .ko{flex:1;text-align:right;color:var(--muted);font-size:.72rem;font-weight:500}
+
+  /* ============ top scorers (golden boot) ============ */
+  .sc-list{background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.3)}
+  .sc-row{display:flex;align-items:center;gap:13px;padding:13px 16px;border-bottom:1px solid var(--line)}
+  .sc-row:last-child{border-bottom:none}
+  .sc-row:hover{background:rgba(255,255,255,.03)}
+  .sc-rank{width:26px;text-align:center;font-weight:800;color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
+  .sc-row.top .sc-rank{font-size:1.3rem}
+  .sc-fl{font-size:1.3rem;flex:none;width:1.4em;text-align:center}
+  .sc-info{flex:1;min-width:0}
+  .sc-name{font-weight:700;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sc-team{color:var(--muted);font-size:.74rem;font-weight:500}
+  .sc-meta{color:var(--muted);font-size:.68rem;margin-top:2px}
+  .sc-goals{font-weight:800;font-size:1.25rem;color:var(--emerald);flex:none;font-variant-numeric:tabular-nums}
+  .sc-goals small{font-size:.62rem;color:var(--muted);font-weight:600;margin-left:3px}
+  .sc-row.top .sc-goals{color:var(--gold)}
+
   /* ============ flag ribbon ============ */
   .flags{margin:16px -14px 2px;overflow:hidden;
     -webkit-mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
@@ -251,7 +298,8 @@
       <button class="tab active" data-tab="predict">Picks</button>
       <button class="tab" data-tab="reveal">Reveal</button>
       <button class="tab" data-tab="board">Leaderboard</button>
-      <button class="tab" data-tab="model">Odds</button>
+      <button class="tab" data-tab="bracket">Bracket</button>
+      <button class="tab" data-tab="scorers">Top Scorers</button>
     </div>
 
     <div class="panel show" id="predict">
@@ -269,9 +317,14 @@
       <div id="boardList"></div>
     </div>
 
-    <div class="panel" id="model">
-      <div class="hint">A Monte-Carlo model (5,000 simulations) rates each team on results so far and plays out the remaining group games. Top 2 of every group + the 8 best third-placed teams reach the knockouts. Updates automatically as real scores land.</div>
-      <div id="modelList"></div>
+    <div class="panel" id="bracket">
+      <div class="hint">The road to the final. <b style="color:var(--lime)">Confirmed knockout fixtures</b> from the live feed appear up top and fill in automatically as each group wraps up. Below, a model plays out the remaining group games to <b>project who qualifies</b> — top 2 of each group plus the 8 best third-placed teams. Times in 🇮🇪 Irish.</div>
+      <div id="bracketList"></div>
+    </div>
+
+    <div class="panel" id="scorers">
+      <div class="hint">🥇 The Golden Boot race — the tournament's top scorers, updated automatically after every game. ⚽ goals · 🅿 penalties · 🅰 assists.</div>
+      <div id="scorersList"></div>
     </div>
   </div>
 </div>
@@ -289,6 +342,22 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const $ = id => document.getElementById(id);
 const PICK_LABEL = { H:'Home win', D:'Draw', A:'Away win' };
+
+// Flag emoji per national team (keys must match football-data.org's names).
+const TEAM_FLAG = {
+  'Algeria':'🇩🇿','Argentina':'🇦🇷','Australia':'🇦🇺','Austria':'🇦🇹','Belgium':'🇧🇪',
+  'Bosnia-Herzegovina':'🇧🇦','Brazil':'🇧🇷','Canada':'🇨🇦','Cape Verde Islands':'🇨🇻',
+  'Colombia':'🇨🇴','Congo DR':'🇨🇩','Croatia':'🇭🇷','Curaçao':'🇨🇼','Czechia':'🇨🇿',
+  'Ecuador':'🇪🇨','Egypt':'🇪🇬','England':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','France':'🇫🇷','Germany':'🇩🇪','Ghana':'🇬🇭',
+  'Haiti':'🇭🇹','Iran':'🇮🇷','Iraq':'🇮🇶','Ivory Coast':'🇨🇮','Japan':'🇯🇵','Jordan':'🇯🇴',
+  'Mexico':'🇲🇽','Morocco':'🇲🇦','Netherlands':'🇳🇱','New Zealand':'🇳🇿','Norway':'🇳🇴',
+  'Panama':'🇵🇦','Paraguay':'🇵🇾','Portugal':'🇵🇹','Qatar':'🇶🇦','Saudi Arabia':'🇸🇦',
+  'Scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿','Senegal':'🇸🇳','South Africa':'🇿🇦','South Korea':'🇰🇷','Spain':'🇪🇸',
+  'Sweden':'🇸🇪','Switzerland':'🇨🇭','Tunisia':'🇹🇳','Turkey':'🇹🇷','United States':'🇺🇸',
+  'Uruguay':'🇺🇾','Uzbekistan':'🇺🇿',
+};
+const flag = t => TEAM_FLAG[t] || '🏳️';
+
 // escape anything user-controlled before it goes into innerHTML (player names can be
 // written via the public API, so treat them as untrusted)
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g,
@@ -301,6 +370,7 @@ let lastPin = '';          // PIN entered this session (not persisted) — for q
 let matches = [];          // all fixtures
 let picks   = {};          // my picks {match_id: 'H'|'D'|'A'} (local source of truth)
 let revealed = [];         // predictions visible (post-kickoff) from the DB
+let scorers  = [];         // tournament top scorers (Golden Boot), synced from football-data
 
 const toast = msg => { const t=$('toast'); t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),1800); };
@@ -459,6 +529,15 @@ async function loadRevealed(){
 function loadMyPicks(){
   picks = JSON.parse(localStorage.getItem('wc_picks_'+nick) || '{}');
 }
+async function loadScorers(){
+  // The scorers table is public-readable; the sync robot fills it. If the table
+  // doesn't exist yet (SQL not run), just leave the list empty — no hard failure.
+  const { data, error } = await db.from('scorers')
+    .select('player,team,goals,assists,penalties,played_matches')
+    .order('goals', { ascending:false });
+  if(error){ console.warn('scorers load skipped:', error.message); scorers = []; return; }
+  scorers = data || [];
+}
 
 /* ---------- predict tab ---------- */
 function renderPredict(){
@@ -569,15 +648,37 @@ function renderBoard(){
   maybeConfetti();
 }
 
-/* ---------- qualification model (Monte-Carlo) ---------- */
-function renderModel(){
-  const list = $('modelList'); if(!list) return;
-  const groupMs = {};
-  matches.forEach(m=>{ if(!isGroup(m)) return; (groupMs[m.stage] = groupMs[m.stage]||[]).push(m); });
-  const gnames = Object.keys(groupMs).sort();
-  if(!gnames.length){ list.innerHTML = `<div class="empty">No group fixtures loaded yet.</div>`; return; }
+/* ---------- top scorers (Golden Boot) ---------- */
+function renderScorers(){
+  const list = $('scorersList'); if(!list) return;
+  if(!scorers.length){
+    list.innerHTML = `<div class="empty">No goals logged yet.<br>The Golden Boot table fills in automatically once the tournament's scorers come through the feed.</div>`;
+    return;
+  }
+  const rows = scorers.slice().sort((a,b)=> (b.goals||0)-(a.goals||0)
+    || (b.assists||0)-(a.assists||0) || (a.played_matches||99)-(b.played_matches||99));
+  list.innerHTML = `<div class="sc-list">` + rows.map((s,i)=>{
+    const meta = [];
+    if(s.penalties!=null && s.penalties>0) meta.push(`🅿 ${s.penalties} pen`);
+    if(s.assists!=null   && s.assists>0)   meta.push(`🅰 ${s.assists} ast`);
+    if(s.played_matches!=null)             meta.push(`${s.played_matches} app`);
+    const g = s.goals||0;
+    return `<div class="sc-row ${i<3?'top':''}">
+      <span class="sc-rank">${i+1}</span>
+      <span class="sc-fl">${flag(s.team)}</span>
+      <span class="sc-info">
+        <span class="sc-name">${esc(s.player)}</span>
+        <span class="sc-team">${esc(s.team||'')}</span>
+        ${meta.length?`<div class="sc-meta">${meta.join(' · ')}</div>`:''}
+      </span>
+      <span class="sc-goals">${g}<small>${g===1?'goal':'goals'}</small></span>
+    </div>`;
+  }).join('') + `</div>`;
+}
 
-  // team attack/defence ratings from finished games (shrunk toward the league average)
+/* ---------- knockout bracket (live projection) ---------- */
+// Attack/defence ratings from finished group games, shrunk toward the league average.
+function teamRatings(){
   const gf={}, ga={}, gp={}; let tg=0, tm=0;
   matches.forEach(m=>{ if(!isGroup(m)||m.home_score==null||m.away_score==null) return;
     gf[m.home_team]=(gf[m.home_team]||0)+m.home_score; ga[m.home_team]=(ga[m.home_team]||0)+m.away_score; gp[m.home_team]=(gp[m.home_team]||0)+1;
@@ -586,63 +687,132 @@ function renderModel(){
   const lg = tm ? tg/(2*tm) : 1.3, PR = 1.6, HOME = 1.08;
   const atk = t => ((gf[t]||0)+PR*lg)/(((gp[t]||0)+PR)*lg);
   const def = t => ((ga[t]||0)+PR*lg)/(((gp[t]||0)+PR)*lg);
-  const pois = l => { let L=Math.exp(-l), k=0, p=1; do{ k++; p*=Math.random(); }while(p>L); return k-1; };
+  return { lg, HOME, atk, def };
+}
 
-  // current standings (base) + the games still to play, per group
-  const base={}, rem={}, teams={};
-  gnames.forEach(g=>{ base[g]={}; rem[g]=[];
-    groupMs[g].forEach(m=>{ [m.home_team,m.away_team].forEach(t=>{
-      if(!base[g][t]){ base[g][t]={pts:0,gd:0,gf:0,pld:0}; teams[t]=g; } }); });
+function renderBracket(){
+  const list = $('bracketList'); if(!list) return;
+  const groupMs = {};
+  matches.forEach(m=>{ if(!isGroup(m)) return; (groupMs[m.stage]=groupMs[m.stage]||[]).push(m); });
+  const gnames = Object.keys(groupMs).sort();
+  if(!gnames.length){ list.innerHTML = `<div class="empty">No fixtures loaded yet.</div>`; return; }
+
+  const { lg, HOME, atk, def } = teamRatings();
+
+  // Expected points/GD/GF for one unplayed fixture, via a Poisson goals model.
+  const fact=[1,1,2,6,24,120,720,5040,40320,362880];
+  const pmf=(l,k)=> Math.exp(-l)*Math.pow(l,k)/fact[k];
+  function expFrom(h,a){
+    const lh=lg*atk(h)*def(a)*HOME, la=lg*atk(a)*def(h)/HOME;
+    let hp=0,ap=0,hgd=0,agd=0,hgf=0,agf=0;
+    for(let x=0;x<10;x++) for(let y=0;y<10;y++){
+      const p=pmf(lh,x)*pmf(la,y);
+      if(x>y) hp+=3*p; else if(y>x) ap+=3*p; else { hp+=p; ap+=p; }
+      hgd+=(x-y)*p; agd+=(y-x)*p; hgf+=x*p; agf+=y*p;
+    }
+    return {hp,ap,hgd,agd,hgf,agf};
+  }
+
+  // Projected final table per group: actual results + expected from remaining games.
+  const ord = {}, hasRem = {};
+  gnames.forEach(g=>{
+    const T={};
+    groupMs[g].forEach(m=>[m.home_team,m.away_team].forEach(t=>{ if(!T[t]) T[t]={t,pts:0,gd:0,gf:0,pld:0}; }));
     groupMs[g].forEach(m=>{
-      if(m.home_score!=null && m.away_score!=null){ const T=base[g];
+      if(m.home_score!=null && m.away_score!=null){
         T[m.home_team].pld++; T[m.away_team].pld++;
         T[m.home_team].gf+=m.home_score; T[m.away_team].gf+=m.away_score;
         T[m.home_team].gd+=m.home_score-m.away_score; T[m.away_team].gd+=m.away_score-m.home_score;
         if(m.home_score>m.away_score) T[m.home_team].pts+=3;
         else if(m.away_score>m.home_score) T[m.away_team].pts+=3;
         else { T[m.home_team].pts++; T[m.away_team].pts++; }
-      } else rem[g].push(m);
+      } else {
+        hasRem[g]=true;
+        const e=expFrom(m.home_team,m.away_team);
+        T[m.home_team].pts+=e.hp; T[m.away_team].pts+=e.ap;
+        T[m.home_team].gd +=e.hgd; T[m.away_team].gd +=e.agd;
+        T[m.home_team].gf +=e.hgf; T[m.away_team].gf +=e.agf;
+        T[m.home_team].pld++; T[m.away_team].pld++;
+      }
     });
+    ord[g] = Object.values(T).sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf);
   });
 
-  // simulate
-  const N=5000, adv={};
-  Object.keys(teams).forEach(t=>adv[t]=0);
-  for(let s=0;s<N;s++){
-    const thirds=[];
-    gnames.forEach(g=>{
-      const T={}; for(const t in base[g]) T[t]={...base[g][t]};
-      rem[g].forEach(m=>{ const h=m.home_team, a=m.away_team;
-        const gh=pois(lg*atk(h)*def(a)*HOME), gv=pois(lg*atk(a)*def(h)/HOME);
-        T[h].gf+=gh; T[a].gf+=gv; T[h].gd+=gh-gv; T[a].gd+=gv-gh;
-        if(gh>gv) T[h].pts+=3; else if(gv>gh) T[a].pts+=3; else { T[h].pts++; T[a].pts++; }
-      });
-      const arr=Object.entries(T).map(([t,v])=>({t,...v,r:Math.random()}));
-      arr.sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf || x.r-y.r);
-      adv[arr[0].t]++; adv[arr[1].t]++;   // top 2 advance
-      thirds.push(arr[2]);                // 3rd place into the best-thirds pool
-    });
-    thirds.sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf || x.r-y.r);
-    for(let i=0;i<8 && i<thirds.length;i++) adv[thirds[i].t]++;   // 8 best thirds advance
-  }
+  // The 8 best projected third-placed teams take the extra knockout spots.
+  const thirds = gnames.map(g=>ord[g][2]).filter(Boolean)
+    .sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf);
+  const qualThirds = new Set(thirds.slice(0,8).map(t=>t.t));
 
-  list.innerHTML = gnames.map(g=>{
-    const rows = Object.keys(base[g]).map(t=>({t, pld:base[g][t].pld, pts:base[g][t].pts, adv:adv[t]/N}))
-      .sort((a,b)=> b.adv-a.adv || b.pts-a.pts);
-    return `<div class="match" style="--accent:#2fd47a">
-      <div class="qhead"><span class="gname">${g}</span><span class="gtag">chance to advance</span></div>
-      ${rows.map(r=>{
-        const pc = Math.round(r.adv*100);
-        const col = pc>=65?'var(--emerald)':pc>=35?'var(--gold)':'var(--muted)';
-        return `<div class="qrow ${pc<15?'q-out':''}">
-          <span class="qn">${r.t}<span class="qmeta">${r.pts} pt · ${r.pld} pld</span></span>
-          <span class="qbar"><i data-w="${pc}" style="width:0%;background:${col}"></i></span>
-          <span class="qpct" style="color:${col}">${pc}%</span>
-        </div>`;
-      }).join('')}
+  // Confirmed knockout fixtures straight from the live feed (always correct).
+  const feedKO = matches.filter(m=> !isGroup(m) && m.home_team && m.away_team)
+    .sort((x,y)=> new Date(x.kickoff)-new Date(y.kickoff));
+  const placed = new Set(); feedKO.forEach(m=>{ placed.add(m.home_team); placed.add(m.away_team); });
+
+  const teamHTML = (name, opts={}) => {
+    const score = opts.score!=null ? `<span class="sc">${opts.score}</span>` : '';
+    return `<div class="bk-team ${opts.win?'win':''}"><span class="fl">${flag(name)}</span><span class="tn">${esc(name)}</span>${score}</div>`;
+  };
+  const koCard = (m, label) => {
+    const played = m.home_score!=null && m.away_score!=null;
+    const hOpt = played?{score:m.home_score, win:m.home_score>m.away_score}:{};
+    const aOpt = played?{score:m.away_score, win:m.away_score>m.home_score}:{};
+    return `<div class="bkmatch" style="--accent:${stageAccent(m.stage)}">
+      <div class="bk-top"><span>${esc(label)}</span><span class="bk-tag ok">✓ confirmed</span></div>
+      ${teamHTML(m.home_team, hOpt)}
+      <div class="bk-mid"><span class="vs">vs</span><span class="ko">${played?'full time':fmtKO(m.kickoff)}</span></div>
+      ${teamHTML(m.away_team, aOpt)}
+    </div>`;
+  };
+
+  // ---- confirmed bracket, bucketed by round (auto-fills as the feed lands) ----
+  const BUCKETS = [
+    {h:'Round of 32',          t:s=>s.includes('32')},
+    {h:'Round of 16',          t:s=>s.includes('16')},
+    {h:'Quarter-finals',       t:s=>s.includes('quarter')},
+    {h:'Semi-finals',          t:s=>s.includes('semi')},
+    {h:'Third-place play-off', t:s=>s.includes('third')},
+    {h:'Final',                t:s=>s==='final'},
+  ];
+  let confirmed = '', shownAny = false;
+  BUCKETS.forEach(b=>{
+    const ms = feedKO.filter(m=> b.t((m.stage||'').toLowerCase()));
+    if(!ms.length) return;
+    shownAny = true;
+    confirmed += `<div class="bk-stage">${b.h}</div>` + ms.map(m=>koCard(m, b.h)).join('');
+  });
+  if(!shownAny) confirmed = `<div class="empty">No knockout fixtures confirmed yet.<br>They appear here automatically as the groups finish.</div>`;
+
+  // ---- projected qualifiers, per group ----
+  const STATUS = (i, t) => i<2 ? {l:'Through', c:'var(--emerald)'}
+    : i===2 ? (qualThirds.has(t) ? {l:'Best 3rd', c:'var(--gold)'} : {l:'3rd — out', c:'var(--muted)', out:true})
+    : {l:'Out', c:'var(--muted)', out:true};
+  const projected = gnames.map(g=>{
+    const rem = hasRem[g];
+    const rows = ord[g].map((r,i)=>{
+      const st = STATUS(i, r.t);
+      const pts = rem ? r.pts.toFixed(1) : Math.round(r.pts);
+      const tick = placed.has(r.t) ? ' <span style="color:var(--lime)">✓</span>' : '';
+      return `<div class="qrow ${st.out?'q-out':''}">
+        <span style="width:18px;color:var(--muted);font-weight:800;flex:none;text-align:center">${i+1}</span>
+        <span class="bk-team" style="flex:1;padding:0"><span class="fl">${flag(r.t)}</span><span class="tn">${esc(r.t)}${tick}</span></span>
+        <span class="qmeta" style="flex:none">${pts} pts</span>
+        <span style="color:${st.c};font-weight:800;font-size:.66rem;flex:none;width:62px;text-align:right">${st.l}</span>
+      </div>`;
+    }).join('');
+    return `<div class="bkmatch" style="--accent:#2fd47a">
+      <div class="bk-top"><span>${esc(g)}</span><span>${rem?'projected finish':'final standings'}</span></div>
+      ${rows}
     </div>`;
   }).join('');
-  requestAnimationFrame(()=>{ list.querySelectorAll('.qbar i').forEach(el=>{ el.style.width=el.dataset.w+'%'; }); });
+
+  list.innerHTML =
+    `<div class="bk-legend">
+       <span><b style="color:var(--lime)">✓</b> confirmed by feed</span>
+       <span><b style="color:var(--emerald)">●</b> through</span>
+       <span><b style="color:var(--gold)">●</b> best-3rd spot</span>
+     </div>`
+    + confirmed
+    + `<div class="bk-stage">Projected to qualify</div>` + projected;
 }
 
 /* ---------- tabs ---------- */
@@ -666,8 +836,8 @@ async function init(){
   }
   loadMyPicks();
   try{
-    await Promise.all([loadMatches(), loadRevealed()]);
-    renderPredict(); renderReveal(); renderBoard(); renderModel();
+    await Promise.all([loadMatches(), loadRevealed(), loadScorers()]);
+    renderPredict(); renderReveal(); renderBoard(); renderBracket(); renderScorers();
   }catch(e){
     console.error(e);
     $('predictList').innerHTML = `<div class="err"><b>Couldn't reach the database.</b><br>

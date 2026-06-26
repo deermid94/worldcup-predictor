@@ -77,7 +77,58 @@ Deno.serve(async () => {
   }
 
   const finished = rows.filter((r: any) => r.home_score != null).length;
-  const msg = `Synced ${rows.length} fixtures (${finished} with final scores).`;
+
+  // 4. Top scorers (Golden Boot). Secondary data — a failure here must
+  //    not abort the run, since fixtures/scores are what really matter.
+  let scorerMsg = "";
+  try {
+    scorerMsg = " " + await syncScorers();
+  } catch (e) {
+    console.error("Scorers sync skipped:", e);
+  }
+
+  const msg = `Synced ${rows.length} fixtures (${finished} with final scores).${scorerMsg}`;
   console.log(msg);
   return new Response(msg, { status: 200 });
 });
+
+// Pull the tournament's leading scorers and mirror them into our table.
+async function syncScorers(): Promise<string> {
+  const res = await fetch(`https://api.football-data.org/v4/competitions/${COMP}/scorers?limit=30`, {
+    headers: { "X-Auth-Token": FD_KEY! },
+  });
+  if (!res.ok) {
+    console.error("scorers fetch", res.status, await res.text());
+    return "Scorers fetch failed.";
+  }
+  const { scorers = [] } = await res.json();
+
+  const rows = scorers
+    .filter((s: any) => s.player?.id && s.player?.name)
+    .map((s: any) => ({
+      ext_id: s.player.id,
+      player: s.player.name,
+      team: s.team?.name ?? null,
+      goals: s.goals ?? 0,
+      assists: s.assists ?? null,
+      penalties: s.penalties ?? null,
+      played_matches: s.playedMatches ?? null,
+    }));
+  if (!rows.length) return "No scorers yet.";
+
+  const up = await fetch(`${SB_URL}/rest/v1/scorers?on_conflict=ext_id`, {
+    method: "POST",
+    headers: {
+      apikey: SB_KEY!,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify(rows),
+  });
+  if (!up.ok) {
+    console.error("Supabase scorers upsert", up.status, await up.text());
+    return "Scorers upsert failed.";
+  }
+  return `Synced ${rows.length} top scorers.`;
+}
