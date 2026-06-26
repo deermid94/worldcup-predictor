@@ -341,7 +341,7 @@
     </div>
 
     <div class="panel" id="mine">
-      <div class="hint">Your own picks, just for you 👀 — a reminder of every call you've made, including your locked group picks. Nobody else can see these until each game kicks off.</div>
+      <div class="hint">Your picks for games still to come 👀 — a private reminder, soonest first, including your locked group picks. Once a game kicks off it moves to the Reveal tab. Nobody else can see these until then.</div>
       <div id="mineList"></div>
     </div>
 
@@ -650,23 +650,18 @@ function renderMine(){
     $('minePin').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
     return;
   }
-  const mine = matches.filter(m=> myAll[m.id]!=null)
+  // Only games that haven't kicked off yet — the upcoming reminder. Picks for games
+  // that have started are visible to everyone in the Reveal tab. Soonest first.
+  const mine = matches.filter(m=> myAll[m.id]!=null && !started(m))
     .sort((a,b)=> new Date(a.kickoff)-new Date(b.kickoff));
-  if(!mine.length){ list.innerHTML = `<div class="empty">No picks found for you yet.</div>`; return; }
+  if(!mine.length){ list.innerHTML = `<div class="empty">No upcoming picks right now.<br>Picks for games that have kicked off are over in the <b>Reveal</b> tab. New knockout picks will appear here once you've made them.</div>`; return; }
   const pickText = (m,p)=> p==='H' ? `${m.home_team} to win` : p==='A' ? `${m.away_team} to win` : 'Draw';
   list.innerHTML = mine.map(m=>{
-    const p = myAll[m.id], res = outcome(m), open = started(m);
-    const hit = res!=null ? (p===res) : null;
-    const badge = open
-      ? (res!=null
-          ? (hit ? `<span class="result" style="color:var(--lime)">✓ correct</span>`
-                 : `<span class="pending">✗ missed</span>`)
-          : `<span class="pending">in play</span>`)
-      : `<span class="lockmsg">🔒 hidden from others</span>`;
+    const p = myAll[m.id];
     return `<div class="match reveal" style="--accent:${stageAccent(m.stage)}">
-      <div class="stage"><span class="st">${m.stage||''}</span><span class="ko">${fmtKO(m.kickoff)}</span></div>
+      <div class="stage"><span class="st">${m.stage||''}</span><span class="ko">🔒 locks ${fmtKO(m.kickoff)}</span></div>
       <div class="row"><div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div></div>
-      <div class="picks"><span class="chip ${hit===true?'hit':''}">Your pick: <b>${pickText(m,p)}</b></span> ${badge}</div>
+      <div class="picks"><span class="chip">Your pick: <b>${pickText(m,p)}</b></span> <span class="lockmsg">🔒 hidden from others until kickoff</span></div>
     </div>`;
   }).join('');
 }
