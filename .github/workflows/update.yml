@@ -1,10 +1,12 @@
 name: Sync World Cup fixtures & scores
 
-# Runs automatically every 2 hours, plus a manual "Run workflow" button.
-# (A sparser schedule is throttled less aggressively by GitHub than */15.)
+# Runs automatically every hour (bumped up for the knockout stage), plus a
+# manual "Run workflow" button. Hourly (24/day) is still light enough that
+# GitHub doesn't throttle it the way it did the old */15 schedule (96/day).
+# The :17 offset avoids the top-of-hour congestion where GitHub delays/skips most.
 on:
   schedule:
-    - cron: '0 */2 * * *'       # top of every 2nd hour (UTC). GitHub may still skip overnight.
+    - cron: '17 * * * *'        # 17 minutes past every hour (UTC)
   workflow_dispatch:            # lets you trigger it by hand from the Actions tab
 
 jobs:
