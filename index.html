@@ -328,6 +328,7 @@
   <div id="app" style="display:none">
     <div class="tabs">
       <button class="tab active" data-tab="predict">Picks</button>
+      <button class="tab" data-tab="mine">My Picks</button>
       <button class="tab" data-tab="reveal">Reveal</button>
       <button class="tab" data-tab="board">Leaderboard</button>
       <button class="tab" data-tab="bracket">Bracket</button>
@@ -337,6 +338,11 @@
     <div class="panel show" id="predict">
       <div class="hint">Group-stage picks are locked in 🔒. Knockout picks open here once those fixtures are set — change them any time before kickoff, then hit Save. All times shown in 🇮🇪 Irish time.</div>
       <div id="predictList"></div>
+    </div>
+
+    <div class="panel" id="mine">
+      <div class="hint">Your own picks, just for you 👀 — a reminder of every call you've made, including your locked group picks. Nobody else can see these until each game kicks off.</div>
+      <div id="mineList"></div>
     </div>
 
     <div class="panel" id="reveal">
@@ -403,6 +409,7 @@ let matches = [];          // all fixtures
 let picks   = {};          // my picks {match_id: 'H'|'D'|'A'} (local source of truth)
 let revealed = [];         // predictions visible (post-kickoff) from the DB
 let scorers  = [];         // tournament top scorers (Golden Boot), synced from football-data
+let myAll    = null;       // {match_id: pick} — this player's OWN picks (PIN-verified), null until loaded
 
 const toast = msg => { const t=$('toast'); t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),1800); };
@@ -470,7 +477,7 @@ async function renderLogin(){
       <button class="ghost" id="changePin">Change PIN</button>
       <button class="ghost" id="logout">Switch player</button>`;
     $('changePin').onclick = ()=>showChangePin(false);
-    $('logout').onclick = ()=>{ localStorage.removeItem('wc_nick'); nick=''; lastPin='';
+    $('logout').onclick = ()=>{ localStorage.removeItem('wc_nick'); nick=''; lastPin=''; myAll=null;
       picks={}; $('pinPanel').innerHTML=''; init(); };
     $('app').style.display='block';
     return;
@@ -561,6 +568,18 @@ async function loadRevealed(){
 function loadMyPicks(){
   picks = JSON.parse(localStorage.getItem('wc_picks_'+nick) || '{}');
 }
+// Fetch THIS player's own picks (all of them, incl. locked group picks), PIN-verified
+// server-side. Returns the number of picks found (0 = wrong PIN or none, -1 = error).
+async function loadMyAll(pin){
+  try{
+    const { data, error } = await db.rpc('my_predictions', { p_name:nick, p_pin:pin });
+    if(error) throw error;
+    if(!data || !data.length){ return 0; }
+    const all = {}; data.forEach(r=> all[r.match_id] = r.pick);
+    myAll = all; lastPin = pin;
+    return data.length;
+  }catch(e){ console.warn('my_predictions failed:', e.message||e); return -1; }
+}
 async function loadScorers(){
   // The scorers table is public-readable; the sync robot fills it. If the table
   // doesn't exist yet (SQL not run), just leave the list empty — no hard failure.
@@ -606,6 +625,50 @@ async function savePicks(){
   const { error } = await db.from('predictions').upsert(rows, { onConflict:'player,match_id' });
   if(error){ toast('Save failed'); console.error(error); return; }
   toast('✓ Saved — locked secrets!');
+}
+
+/* ---------- my picks (private reminder) ---------- */
+function renderMine(){
+  const list = $('mineList'); if(!list) return;
+  // Not unlocked yet this session → ask for the PIN (so only the owner sees them).
+  if(!myAll){
+    list.innerHTML = `
+      <div style="max-width:340px;margin:14px auto;background:var(--glass);backdrop-filter:blur(16px);
+        border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.4)">
+        <div class="hint" style="margin:0 0 12px">Enter your PIN to reveal your own picks.</div>
+        <input id="minePin" type="password" inputmode="numeric" maxlength="12" placeholder="Your PIN" style="width:100%;margin-bottom:10px">
+        <button class="primary" id="mineGo" style="width:100%">Show my picks</button>
+      </div>`;
+    const go = async ()=>{
+      const pin = $('minePin').value.trim();
+      if(!pin){ toast('Enter your PIN'); return; }
+      const n = await loadMyAll(pin);
+      if(n>0) renderMine();
+      else toast(n===0 ? 'Wrong PIN' : 'Something went wrong');
+    };
+    $('mineGo').onclick = go;
+    $('minePin').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+    return;
+  }
+  const mine = matches.filter(m=> myAll[m.id]!=null)
+    .sort((a,b)=> new Date(a.kickoff)-new Date(b.kickoff));
+  if(!mine.length){ list.innerHTML = `<div class="empty">No picks found for you yet.</div>`; return; }
+  const pickText = (m,p)=> p==='H' ? `${m.home_team} to win` : p==='A' ? `${m.away_team} to win` : 'Draw';
+  list.innerHTML = mine.map(m=>{
+    const p = myAll[m.id], res = outcome(m), open = started(m);
+    const hit = res!=null ? (p===res) : null;
+    const badge = open
+      ? (res!=null
+          ? (hit ? `<span class="result" style="color:var(--lime)">✓ correct</span>`
+                 : `<span class="pending">✗ missed</span>`)
+          : `<span class="pending">in play</span>`)
+      : `<span class="lockmsg">🔒 hidden from others</span>`;
+    return `<div class="match reveal" style="--accent:${stageAccent(m.stage)}">
+      <div class="stage"><span class="st">${m.stage||''}</span><span class="ko">${fmtKO(m.kickoff)}</span></div>
+      <div class="row"><div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div></div>
+      <div class="picks"><span class="chip ${hit===true?'hit':''}">Your pick: <b>${pickText(m,p)}</b></span> ${badge}</div>
+    </div>`;
+  }).join('');
 }
 
 /* ---------- reveal tab ---------- */
@@ -911,7 +974,10 @@ async function init(){
   loadMyPicks();
   try{
     await Promise.all([loadMatches(), loadRevealed(), loadScorers()]);
-    renderPredict(); renderReveal(); renderBoard(); renderBracket(); renderScorers();
+    // If they logged in with their PIN this session, pull their own picks up front
+    // so the My Picks tab is ready; otherwise it'll ask for the PIN on demand.
+    if(lastPin) await loadMyAll(lastPin);
+    renderPredict(); renderMine(); renderReveal(); renderBoard(); renderBracket(); renderScorers();
   }catch(e){
     console.error(e);
     $('predictList').innerHTML = `<div class="err"><b>Couldn't reach the database.</b><br>
