@@ -350,7 +350,7 @@
     </div>
 
     <div class="panel" id="bracket">
-      <div class="hint">The full road to the final — scroll sideways to follow it 👉. <b style="color:var(--emerald)">Solid</b> games are confirmed by the live feed; <b style="color:var(--gold)">dashed</b> ones are the model's projection (winners advance automatically, snapping to real as results land). Detailed group projections are below.</div>
+      <div class="hint">The knockout bracket — scroll sideways 👉. The <b>Last 32</b> shows the expected match-ups (<b style="color:var(--emerald)">solid</b> = confirmed by the feed, <b style="color:var(--gold)">dashed</b> = projected). Later rounds fill in automatically as games are played — nothing past the Last 32 is projected. Detailed group projections are below.</div>
       <div id="bracketList"></div>
     </div>
 
@@ -792,7 +792,6 @@ function renderBracket(){
   const letter = g => g.replace(/^Group\s*/i,'').trim();
   const byLetter = {}; gnames.forEach(g=> byLetter[letter(g)] = ord[g]);
   const posTeam = ([p,g]) => byLetter[g] ? (byLetter[g][+p-1]?.t || null) : null;
-  const str = t => t ? atk(t)/def(t) : 0;
   const pairKey = (a,b)=> [a,b].sort().join(' | ');
 
   // confirmed knockout fixtures from the feed, keyed by team-pair
@@ -800,8 +799,9 @@ function renderBracket(){
   matches.filter(m=> !isGroup(m) && m.home_team && m.away_team)
     .forEach(m=> feedByPair.set(pairKey(m.home_team,m.away_team), m));
 
-  // build one node {a,b,scores,winner,confirmed}, picking the winner from the real
-  // result if played, otherwise the stronger side
+  // build one node {a,b,scores,winner,confirmed}. The advancing winner is set ONLY
+  // when the game has actually been played — we never project who goes through, so
+  // nothing past the Last 32 is invented; later rounds fill in from real results.
   const nodeFrom = (a,b,conf)=>{
     const played = conf && conf.home_score!=null && conf.away_score!=null;
     let sa=null, sb=null, win=null;
@@ -809,7 +809,7 @@ function renderBracket(){
       sa = conf.home_team===a ? conf.home_score : conf.away_score;
       sb = conf.home_team===a ? conf.away_score : conf.home_score;
       win = sa>=sb ? a : b;
-    } else win = (a&&b) ? (str(a)>=str(b)?a:b) : (a||b);
+    }
     return { a, b, sa, sb, played, conf:!!conf, win };
   };
 
@@ -882,8 +882,8 @@ function renderBracket(){
   list.innerHTML =
     `<div class="bk-legend">
        <span><b style="color:var(--emerald)">solid</b> = confirmed fixture</span>
-       <span><b style="color:var(--gold)">dashed</b> = projected</span>
-       <span>winner highlighted advances ▸</span>
+       <span><b style="color:var(--gold)">dashed</b> = projected Last 32</span>
+       <span>later rounds fill in as games are played</span>
      </div>
      <div class="bkt-scroll"><div class="bkt">${cols}</div></div>
      <div class="bk-stage">Projected group finish</div>` + projected;
