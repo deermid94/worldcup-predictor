@@ -236,11 +236,11 @@
   .bkt-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:999px}
   .bkt{display:flex;align-items:stretch;min-width:max-content}
   .bkt-col{display:flex;flex-direction:column;justify-content:space-around;position:relative;
-    flex:none;width:188px;padding-right:20px}
+    flex:none;width:202px;padding:30px 24px 8px 0;gap:30px}
   .bkt-col.r-final{justify-content:center}
-  .bkt-col-hd{position:absolute;top:-2px;left:0;font-size:.66rem;font-weight:800;letter-spacing:.12em;
+  .bkt-col-hd{position:absolute;top:4px;left:0;font-size:.68rem;font-weight:800;letter-spacing:.12em;
     text-transform:uppercase;color:var(--muted)}
-  .bkt-grp{display:flex;flex-direction:column;justify-content:space-around;flex:1 0 auto;position:relative;gap:14px}
+  .bkt-grp{display:flex;flex-direction:column;justify-content:space-around;flex:1 0 auto;position:relative;gap:16px}
   /* "]" connector joining each pair to the next round */
   .bkt-col:not(.r-final) .bkt-grp:not(.solo)::after{content:"";position:absolute;left:100%;
     top:25%;bottom:25%;width:11px;border:1.4px solid var(--line);border-left:none;border-radius:0 7px 7px 0}
@@ -251,7 +251,7 @@
     width:9px;border-top:1.4px solid var(--line)}
   .bkt-tie.proj{border-style:dashed;opacity:.92}
   .bkt-tie.conf{border-color:rgba(47,212,122,.55);box-shadow:0 0 0 1px rgba(47,212,122,.18)}
-  .bkt-row{display:flex;align-items:center;gap:7px;padding:7px 9px;font-size:.82rem;font-weight:600}
+  .bkt-row{display:flex;align-items:center;gap:7px;padding:9px 10px;font-size:.82rem;font-weight:600}
   .bkt-row+.bkt-row{border-top:1px solid var(--line)}
   .bkt-row .fl{font-size:1rem;flex:none;width:1.3em;text-align:center}
   .bkt-row .tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
