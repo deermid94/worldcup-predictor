@@ -346,7 +346,7 @@
     </div>
 
     <div class="panel" id="reveal">
-      <div class="hint">Games that have kicked off — everyone's picks are now visible. ✓ = correct call.</div>
+      <div class="hint">Everyone's picks — all group games (locked in) plus any knockout game that's kicked off. ✓ = correct call.</div>
       <div id="revealList"></div>
     </div>
 
@@ -668,10 +668,13 @@ function renderMine(){
 
 /* ---------- reveal tab ---------- */
 function renderReveal(){
-  const played = matches.filter(started).sort((a,b)=>new Date(b.kickoff)-new Date(a.kickoff));
+  // Show any game whose picks are now visible: every game that has kicked off,
+  // PLUS group-stage games whose (locked) picks the DB now reveals before kickoff.
+  const visible = matches.filter(m=> started(m) || revealed.some(r=>r.match_id===m.id))
+                         .sort((a,b)=>new Date(b.kickoff)-new Date(a.kickoff));
   const list = $('revealList');
-  if(!played.length){ list.innerHTML = `<div class="empty">No games have kicked off yet.</div>`; return; }
-  list.innerHTML = played.map(m=>{
+  if(!visible.length){ list.innerHTML = `<div class="empty">No games have kicked off yet.</div>`; return; }
+  list.innerHTML = visible.map(m=>{
     const res = outcome(m);
     const ps = revealed.filter(r=>r.match_id===m.id);
     const chips = ps.length ? ps.map(r=>{
@@ -680,7 +683,7 @@ function renderReveal(){
     }).join('') : `<span class="pending">No picks were submitted.</span>`;
     const scoreLine = res
       ? `<span class="result">${m.home_score}–${m.away_score} · ${PICK_LABEL[res]}</span>`
-      : `<span class="pending">awaiting result</span>`;
+      : `<span class="pending">${started(m)?'awaiting result':'not started — picks shown'}</span>`;
     return `<div class="match reveal" style="--accent:${stageAccent(m.stage)}">
       <div class="stage"><span class="st">${m.stage||''}</span><span class="ko">${fmtKO(m.kickoff)}</span></div>
       <div class="row"><div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>${scoreLine}</div>
