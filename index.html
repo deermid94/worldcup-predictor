@@ -229,6 +229,38 @@
   .bk-mid .vs{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
   .bk-mid .ko{flex:1;text-align:right;color:var(--muted);font-size:.72rem;font-weight:500}
 
+  /* ============ scrollable bracket tree ============ */
+  .bkt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -14px;padding:4px 14px 16px;
+    scrollbar-width:thin}
+  .bkt-scroll::-webkit-scrollbar{height:8px}
+  .bkt-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:999px}
+  .bkt{display:flex;align-items:stretch;min-width:max-content}
+  .bkt-col{display:flex;flex-direction:column;justify-content:space-around;position:relative;
+    flex:none;width:188px;padding-right:20px}
+  .bkt-col.r-final{justify-content:center}
+  .bkt-col-hd{position:absolute;top:-2px;left:0;font-size:.66rem;font-weight:800;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted)}
+  .bkt-grp{display:flex;flex-direction:column;justify-content:space-around;flex:1 0 auto;position:relative;gap:14px}
+  /* "]" connector joining each pair to the next round */
+  .bkt-col:not(.r-final) .bkt-grp:not(.solo)::after{content:"";position:absolute;left:100%;
+    top:25%;bottom:25%;width:11px;border:1.4px solid var(--line);border-left:none;border-radius:0 7px 7px 0}
+  /* incoming stub on each match (hidden for the first column) */
+  .bkt-tie{position:relative;background:rgba(8,22,15,.6);border:1.4px solid var(--line);
+    border-radius:11px;overflow:hidden;align-self:center;width:100%}
+  .bkt-col:not(.r-first) .bkt-tie::before{content:"";position:absolute;right:100%;top:50%;
+    width:9px;border-top:1.4px solid var(--line)}
+  .bkt-tie.proj{border-style:dashed;opacity:.92}
+  .bkt-tie.conf{border-color:rgba(47,212,122,.55);box-shadow:0 0 0 1px rgba(47,212,122,.18)}
+  .bkt-row{display:flex;align-items:center;gap:7px;padding:7px 9px;font-size:.82rem;font-weight:600}
+  .bkt-row+.bkt-row{border-top:1px solid var(--line)}
+  .bkt-row .fl{font-size:1rem;flex:none;width:1.3em;text-align:center}
+  .bkt-row .tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bkt-row .sc{flex:none;font-weight:800;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .bkt-row.win{background:rgba(47,212,122,.12)}
+  .bkt-row.win .tn{color:var(--lime);font-weight:800}
+  .bkt-row.win .sc{color:var(--lime)}
+  .bkt-row.tbd{opacity:.5;font-style:italic;font-weight:500}
+
   /* ============ top scorers (golden boot) ============ */
   .sc-list{background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
     border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.3)}
@@ -318,7 +350,7 @@
     </div>
 
     <div class="panel" id="bracket">
-      <div class="hint">The road to the final. <b style="color:var(--lime)">Confirmed knockout fixtures</b> from the live feed appear up top and fill in automatically as each group wraps up. Below, a model plays out the remaining group games to <b>project who qualifies</b> — top 2 of each group plus the 8 best third-placed teams. Times in 🇮🇪 Irish.</div>
+      <div class="hint">The full road to the final — scroll sideways to follow it 👉. <b style="color:var(--emerald)">Solid</b> games are confirmed by the live feed; <b style="color:var(--gold)">dashed</b> ones are the model's projection (winners advance automatically, snapping to real as results land). Detailed group projections are below.</div>
       <div id="bracketList"></div>
     </div>
 
@@ -743,46 +775,88 @@ function renderBracket(){
     .sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf);
   const qualThirds = new Set(thirds.slice(0,8).map(t=>t.t));
 
-  // Confirmed knockout fixtures straight from the live feed (always correct).
-  const feedKO = matches.filter(m=> !isGroup(m) && m.home_team && m.away_team)
-    .sort((x,y)=> new Date(x.kickoff)-new Date(y.kickoff));
-  const placed = new Set(); feedKO.forEach(m=>{ placed.add(m.home_team); placed.add(m.away_team); });
+  const placed = new Set();
+  matches.filter(m=> !isGroup(m) && m.home_team && m.away_team)
+    .forEach(m=>{ placed.add(m.home_team); placed.add(m.away_team); });
 
-  const teamHTML = (name, opts={}) => {
-    const score = opts.score!=null ? `<span class="sc">${opts.score}</span>` : '';
-    return `<div class="bk-team ${opts.win?'win':''}"><span class="fl">${flag(name)}</span><span class="tn">${esc(name)}</span>${score}</div>`;
-  };
-  const koCard = (m, label) => {
-    const played = m.home_score!=null && m.away_score!=null;
-    const hOpt = played?{score:m.home_score, win:m.home_score>m.away_score}:{};
-    const aOpt = played?{score:m.away_score, win:m.away_score>m.home_score}:{};
-    return `<div class="bkmatch" style="--accent:${stageAccent(m.stage)}">
-      <div class="bk-top"><span>${esc(label)}</span><span class="bk-tag ok">✓ confirmed</span></div>
-      ${teamHTML(m.home_team, hOpt)}
-      <div class="bk-mid"><span class="vs">vs</span><span class="ko">${played?'full time':fmtKO(m.kickoff)}</span></div>
-      ${teamHTML(m.away_team, aOpt)}
-    </div>`;
-  };
-
-  // ---- confirmed bracket, bucketed by round (auto-fills as the feed lands) ----
-  const BUCKETS = [
-    {h:'Round of 32',          t:s=>s.includes('32')},
-    {h:'Round of 16',          t:s=>s.includes('16')},
-    {h:'Quarter-finals',       t:s=>s.includes('quarter')},
-    {h:'Semi-finals',          t:s=>s.includes('semi')},
-    {h:'Third-place play-off', t:s=>s.includes('third')},
-    {h:'Final',                t:s=>s==='final'},
+  // ---- live projected bracket tree ----
+  // R32 slots in bracket order; each side is a group position: ['1',g]=winner,
+  // ['2',g]=runner-up, ['3',g]=that group's third. Template validated against the
+  // confirmed feed. Index pairing (2i,2i+1) then forms the tree up to the final.
+  const R32 = [
+    [['1','E'],['3','D']], [['1','I'],['3','F']], [['2','A'],['2','B']], [['1','F'],['2','C']],
+    [['2','K'],['2','L']], [['1','H'],['2','J']], [['1','D'],['3','B']], [['1','G'],['3','A']],
+    [['1','C'],['2','F']], [['2','E'],['2','I']], [['1','A'],['3','C']], [['1','L'],['3','E']],
+    [['1','J'],['2','H']], [['2','D'],['2','G']], [['1','B'],['3','J']], [['1','K'],['3','L']],
   ];
-  let confirmed = '', shownAny = false;
-  BUCKETS.forEach(b=>{
-    const ms = feedKO.filter(m=> b.t((m.stage||'').toLowerCase()));
-    if(!ms.length) return;
-    shownAny = true;
-    confirmed += `<div class="bk-stage">${b.h}</div>` + ms.map(m=>koCard(m, b.h)).join('');
-  });
-  if(!shownAny) confirmed = `<div class="empty">No knockout fixtures confirmed yet.<br>They appear here automatically as the groups finish.</div>`;
+  const letter = g => g.replace(/^Group\s*/i,'').trim();
+  const byLetter = {}; gnames.forEach(g=> byLetter[letter(g)] = ord[g]);
+  const posTeam = ([p,g]) => byLetter[g] ? (byLetter[g][+p-1]?.t || null) : null;
+  const str = t => t ? atk(t)/def(t) : 0;
+  const pairKey = (a,b)=> [a,b].sort().join(' | ');
 
-  // ---- projected qualifiers, per group ----
+  // confirmed knockout fixtures from the feed, keyed by team-pair
+  const feedByPair = new Map();
+  matches.filter(m=> !isGroup(m) && m.home_team && m.away_team)
+    .forEach(m=> feedByPair.set(pairKey(m.home_team,m.away_team), m));
+
+  // build one node {a,b,scores,winner,confirmed}, picking the winner from the real
+  // result if played, otherwise the stronger side
+  const nodeFrom = (a,b,conf)=>{
+    const played = conf && conf.home_score!=null && conf.away_score!=null;
+    let sa=null, sb=null, win=null;
+    if(played){
+      sa = conf.home_team===a ? conf.home_score : conf.away_score;
+      sb = conf.home_team===a ? conf.away_score : conf.home_score;
+      win = sa>=sb ? a : b;
+    } else win = (a&&b) ? (str(a)>=str(b)?a:b) : (a||b);
+    return { a, b, sa, sb, played, conf:!!conf, win };
+  };
+
+  // R32: resolve projected pairings, then overlay confirmed feed fixtures by matching
+  // on the exact (winner/runner) side — so a confirmed game also reveals the real 3rd.
+  const anchor = {};
+  const slots32 = R32.map((slot,i)=>{
+    const a = posTeam(slot[0]), b = posTeam(slot[1]);
+    if(slot[0][0] !== '3' && a) anchor[a] = i;
+    if(slot[1][0] !== '3' && b) anchor[b] = i;
+    return { a, b, conf:null };
+  });
+  matches.filter(m=> !isGroup(m) && /32/.test(m.stage||'') && m.home_team && m.away_team)
+    .forEach(m=>{ const i = anchor[m.home_team] ?? anchor[m.away_team]; if(i!=null) slots32[i].conf = m; });
+
+  let round = slots32.map(s => s.conf
+    ? nodeFrom(s.conf.home_team, s.conf.away_team, s.conf)
+    : nodeFrom(s.a, s.b, null));
+  const rounds = [round];
+  while(round.length > 1){
+    const next = [];
+    for(let i=0;i<round.length;i+=2){
+      const a = round[i].win, b = round[i+1].win;
+      const conf = (a&&b) ? feedByPair.get(pairKey(a,b)) : null;
+      next.push(nodeFrom(a,b,conf));
+    }
+    rounds.push(next); round = next;
+  }
+
+  // ---- render scrollable tree ----
+  const HEADS = ['Round of 32','Round of 16','Quarter-finals','Semi-finals','Final'];
+  const teamRow = (t, win, score) => t
+    ? `<div class="bkt-row ${win?'win':''}"><span class="fl">${flag(t)}</span><span class="tn">${esc(t)}</span><span class="sc">${score==null?'':score}</span></div>`
+    : `<div class="bkt-row tbd"><span class="fl">🏳️</span><span class="tn">TBD</span><span class="sc"></span></div>`;
+  const tieHTML = n => `<div class="bkt-tie ${n.conf?'conf':'proj'}">
+      ${teamRow(n.a, n.a&&n.win===n.a, n.played?n.sa:null)}
+      ${teamRow(n.b, n.b&&n.win===n.b, n.played?n.sb:null)}
+    </div>`;
+  const cols = rounds.map((nodes,ci)=>{
+    const isFinal = nodes.length===1;
+    let inner = `<div class="bkt-col-hd">${HEADS[ci]||''}</div>`;
+    if(isFinal) inner += tieHTML(nodes[0]);
+    else for(let i=0;i<nodes.length;i+=2) inner += `<div class="bkt-grp">${tieHTML(nodes[i])}${tieHTML(nodes[i+1])}</div>`;
+    return `<div class="bkt-col ${ci===0?'r-first':''} ${isFinal?'r-final':''}">${inner}</div>`;
+  }).join('');
+
+  // ---- projected group finish (kept below the tree for detail) ----
   const STATUS = (i, t) => i<2 ? {l:'Through', c:'var(--emerald)'}
     : i===2 ? (qualThirds.has(t) ? {l:'Best 3rd', c:'var(--gold)'} : {l:'3rd — out', c:'var(--muted)', out:true})
     : {l:'Out', c:'var(--muted)', out:true};
@@ -807,12 +881,12 @@ function renderBracket(){
 
   list.innerHTML =
     `<div class="bk-legend">
-       <span><b style="color:var(--lime)">✓</b> confirmed by feed</span>
-       <span><b style="color:var(--emerald)">●</b> through</span>
-       <span><b style="color:var(--gold)">●</b> best-3rd spot</span>
-     </div>`
-    + confirmed
-    + `<div class="bk-stage">Projected to qualify</div>` + projected;
+       <span><b style="color:var(--emerald)">solid</b> = confirmed fixture</span>
+       <span><b style="color:var(--gold)">dashed</b> = projected</span>
+       <span>winner highlighted advances ▸</span>
+     </div>
+     <div class="bkt-scroll"><div class="bkt">${cols}</div></div>
+     <div class="bk-stage">Projected group finish</div>` + projected;
 }
 
 /* ---------- tabs ---------- */
