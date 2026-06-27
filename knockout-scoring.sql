@@ -20,10 +20,11 @@ alter table matches add column if not exists winner   text
   check (winner in ('H','A'));
 alter table matches add column if not exists duration text;
 
--- ---- predictions: the "who progresses" pick --------------------
--- advance: 'H' or 'A' — the team the player thinks goes through.
--- For a Home/Away FT pick this equals that side; it's only an
--- independent choice when the player picks a Draw. Null for group games.
+-- ---- predictions: the 2nd pick — "who wins after ET/pens" ------
+-- advance: 'H' or 'A' — the team the player backs to win after extra
+-- time / penalties. An INDEPENDENT pick made on every knockout game
+-- (alongside the 90-min result). It only scores when the game is level
+-- after 90 (goes to ET/pens); void in a decisive 90' game. Null for groups.
 alter table predictions add column if not exists advance text
   check (advance in ('H','A'));
 

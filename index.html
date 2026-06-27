@@ -336,7 +336,7 @@
     </div>
 
     <div class="panel show" id="predict">
-      <div class="hint">Group-stage picks are locked in 🔒. Knockout picks open here once those fixtures are set — each is worth <b>2 points</b>: the full-time (90-min) result, plus who goes through if it's a draw. Change them any time before kickoff, then hit Save. All times shown in 🇮🇪 Irish time.</div>
+      <div class="hint">Group-stage picks are locked in 🔒. Knockout picks open here once those fixtures are set — <b>two picks</b> per game, worth <b>2 points</b>: <b>1</b> the 90-min result, and <b>2</b> who wins after extra time / penalties. The 2nd pick only scores if the game's level after 90. Change them any time before kickoff, then hit Save. All times shown in 🇮🇪 Irish time.</div>
       <div id="predictList"></div>
     </div>
 
@@ -444,7 +444,12 @@ const advOf = pred => pred.advance || (pred.pick==='H'?'H':pred.pick==='A'?'A':n
 function pickPoints(m, pred){
   if(m.home_score==null||m.away_score==null) return null;
   if(isGroup(m)) return pred.pick===outcome(m) ? 1 : 0;
-  return (pred.pick===koFTResult(m) ? 1 : 0) + (advOf(pred)===koProgressor(m) ? 1 : 0);
+  // Knockout: 1 pt for the full-time (90') result. The 2nd "who progresses"
+  // point only exists when the match actually went past 90' (a real draw) —
+  // a decisive 90' game has no ET, so that pick is void → max 1 pt.
+  const ftPt   = pred.pick===koFTResult(m) ? 1 : 0;
+  const progPt = wentPast90(m) && advOf(pred)===koProgressor(m) ? 1 : 0;
+  return ftPt + progPt;
 }
 
 // per-stage accent colour: groups→emerald, R16→teal, QF→blue, SF→purple, 3rd→orange, final→gold
@@ -620,41 +625,37 @@ function renderPredict(){
   const upcoming = matches.filter(m => !started(m) && !isGroup(m));
   const list = $('predictList');
   if(!upcoming.length){ list.innerHTML = `<div class="empty">No picks open right now.<br>Group-stage picks are locked in. Knockout picks open once those fixtures are confirmed.</div>`; return; }
-  // Every game in this tab is a knockout (group picks are locked), so each
-  // one is worth 2 pts: the full-time (90-min) result + who goes through.
-  // The "who goes through" pick only matters on a Draw — a Home/Away pick
-  // already says who progresses — so it only appears when Draw is selected.
-  list.innerHTML = upcoming.map(m => {
-    const drawn = picks[m.id]==='D';
-    return `
+  // Every game here is a knockout (group picks are locked) → 2 picks, 2 pts:
+  //   1️⃣ the 90-min result (Home / Draw / Away)
+  //   2️⃣ who wins after extra time / penalties (only scores if it's a draw
+  //      after 90 — i.e. the game actually goes the distance).
+  // Migrate older single-pick data: a Home/Away pick implied that side goes
+  // through, so seed the 2nd pick from it (still changeable before kickoff).
+  upcoming.forEach(m => {
+    if(!advances[m.id] && (picks[m.id]==='H' || picks[m.id]==='A')) advances[m.id] = picks[m.id];
+  });
+  list.innerHTML = upcoming.map(m => `
     <div class="match" style="--accent:${stageAccent(m.stage)}">
       <div class="stage"><span class="st">${m.stage||''} · 2 pts</span><span class="ko">🔒 locks ${fmtKO(m.kickoff)}</span></div>
       <div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>
+      <div class="hint" style="margin:8px 0 2px">1️⃣ Result after 90 minutes</div>
       <select class="ft" data-id="${m.id}">
         <option value="">— pick the 90-min result —</option>
         <option value="H" ${picks[m.id]==='H'?'selected':''}>${m.home_team} to win</option>
         <option value="D" ${picks[m.id]==='D'?'selected':''}>Draw after 90</option>
         <option value="A" ${picks[m.id]==='A'?'selected':''}>${m.away_team} to win</option>
       </select>
-      <div class="adv-wrap" data-adv-for="${m.id}" style="${drawn?'':'display:none'}">
-        <div class="hint" style="margin:8px 0 0">If it's a draw, who goes through (extra time / penalties)?</div>
-        <select class="adv" data-id="${m.id}">
-          <option value="">— who progresses? —</option>
-          <option value="H" ${advances[m.id]==='H'?'selected':''}>${m.home_team}</option>
-          <option value="A" ${advances[m.id]==='A'?'selected':''}>${m.away_team}</option>
-        </select>
-      </div>
-    </div>`; }).join('')
+      <div class="hint" style="margin:10px 0 2px">2️⃣ Who wins after extra time / penalties?</div>
+      <select class="adv" data-id="${m.id}">
+        <option value="">— who goes through? —</option>
+        <option value="H" ${advances[m.id]==='H'?'selected':''}>${m.home_team}</option>
+        <option value="A" ${advances[m.id]==='A'?'selected':''}>${m.away_team}</option>
+      </select>
+    </div>`).join('')
     + `<button class="primary save" id="saveBtn">Save my picks</button>`;
   list.querySelectorAll('select.ft').forEach(sel=>{
     sel.onchange = ()=>{ const id=sel.dataset.id;
-      if(sel.value) picks[id]=sel.value; else delete picks[id];
-      // reveal the "who progresses" pick only for a Draw; clear it otherwise
-      const wrap = list.querySelector(`.adv-wrap[data-adv-for="${id}"]`);
-      if(sel.value==='D'){ wrap.style.display=''; }
-      else { wrap.style.display='none'; delete advances[id];
-             const a = wrap.querySelector('select.adv'); if(a) a.value=''; }
-    };
+      if(sel.value) picks[id]=sel.value; else delete picks[id]; };
   });
   list.querySelectorAll('select.adv').forEach(sel=>{
     sel.onchange = ()=>{ const id=sel.dataset.id;
@@ -665,14 +666,14 @@ function renderPredict(){
 
 async function savePicks(){
   const upcoming = matches.filter(m=>!started(m) && !isGroup(m)).map(m=>String(m.id));
-  const chosen = Object.entries(picks).filter(([id,p]) => upcoming.includes(String(id)) && p);
-  // A Draw pick must say who goes through (extra time / penalties).
-  if(chosen.some(([id,p]) => p==='D' && !advances[id])){
-    toast('For a draw, pick who goes through'); return;
+  // A game is "in progress" once either dropdown is set; both are required —
+  // the 90-min result AND who wins after extra time / penalties.
+  const touched = upcoming.filter(id => picks[id] || advances[id]);
+  if(touched.some(id => !(picks[id] && advances[id]))){
+    toast('Each game needs both picks: the 90-min result AND who wins after ET/pens'); return;
   }
-  const rows = chosen.map(([id,p]) => ({
-    player:nick, match_id:Number(id), pick:p,
-    advance: p==='H' ? 'H' : p==='A' ? 'A' : (advances[id] || null),  // win pick implies the side
+  const rows = touched.map(id => ({
+    player:nick, match_id:Number(id), pick:picks[id], advance:advances[id],
   }));
   // keep my own copy locally (the DB hides it from me until kickoff)
   localStorage.setItem('wc_picks_'+nick, JSON.stringify(picks));
@@ -744,10 +745,14 @@ function renderReveal(){
       const ftRes = koFTResult(m), prog = koProgressor(m);
       chips = ps.length ? ps.map(r=>{
         const adv = advOf(r), advName = adv ? teamOf(m,adv) : '?';
-        const ftOK = scored && r.pick===ftRes, adOK = scored && adv===prog;
+        const ko90 = scored && wentPast90(m);   // did it actually go to ET/pens?
+        const ftOK = scored && r.pick===ftRes, adOK = ko90 && adv===prog;
         const pts = (ftOK?1:0)+(adOK?1:0);
-        const cls = !scored ? '' : pts===2 ? 'hit' : pts===0 ? 'miss' : '';
-        return `<span class="chip ${cls}">${esc(r.player)}: <b>${PICK_LABEL[r.pick]||'?'}</b>${ftOK?' ✓':''} → through: <b>${esc(advName)}</b>${adOK?' ✓':''}${scored?` · ${pts} pt${pts===1?'':'s'}`:''}</span>`;
+        const cls = !scored ? '' : pts>=2 ? 'hit' : pts===0 ? 'miss' : '';
+        // The "who progresses" pick only counts when ET/pens actually happened;
+        // in a decisive 90' game it's void, so hide it once the result is in.
+        const through = (!scored || ko90) ? ` → through: <b>${esc(advName)}</b>${adOK?' ✓':''}` : '';
+        return `<span class="chip ${cls}">${esc(r.player)}: <b>${PICK_LABEL[r.pick]||'?'}</b>${ftOK?' ✓':''}${through}${scored?` · ${pts} pt${pts===1?'':'s'}`:''}</span>`;
       }).join('') : `<span class="pending">No picks were submitted.</span>`;
       const dur = m.duration==='PENALTY_SHOOTOUT' ? ' (pens)' : m.duration==='EXTRA_TIME' ? ' (AET)' : '';
       scoreLine = scored
