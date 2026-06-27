@@ -6,8 +6,8 @@
 --  Safe to re-run.
 -- ============================================================
 
--- Re-create the insert policy: before kickoff, not a group game,
--- AND the player must be one of the known entrants.
+-- Re-create the insert policy: picks lock 2 HOURS before kickoff, not a
+-- group game, AND the player must be one of the known entrants.
 drop policy if exists "predictions insertable before kickoff" on predictions;
 create policy "predictions insertable before kickoff" on predictions
   for insert with check (
@@ -15,7 +15,7 @@ create policy "predictions insertable before kickoff" on predictions
     and exists (
       select 1 from matches m
       where m.id = match_id
-        and m.kickoff > now()
+        and m.kickoff > now() + interval '2 hours'
         and m.stage not ilike 'Group%'
     )
   );
@@ -27,12 +27,12 @@ create policy "predictions updatable before kickoff" on predictions
     player in ('Champion','Cactus','Chang','Lizard','Pop Smoke')
     and exists (
       select 1 from matches m
-      where m.id = match_id and m.kickoff > now() and m.stage not ilike 'Group%'
+      where m.id = match_id and m.kickoff > now() + interval '2 hours' and m.stage not ilike 'Group%'
     )
   ) with check (
     player in ('Champion','Cactus','Chang','Lizard','Pop Smoke')
     and exists (
       select 1 from matches m
-      where m.id = match_id and m.kickoff > now() and m.stage not ilike 'Group%'
+      where m.id = match_id and m.kickoff > now() + interval '2 hours' and m.stage not ilike 'Group%'
     )
   );

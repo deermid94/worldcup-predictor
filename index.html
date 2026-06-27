@@ -336,7 +336,7 @@
     </div>
 
     <div class="panel show" id="predict">
-      <div class="hint">Group-stage picks are locked in 🔒. Knockout picks open here once those fixtures are set — <b>two picks</b> per game, worth <b>2 points</b>: <b>1</b> the 90-min result, and <b>2</b> who wins after extra time / penalties. The 2nd pick only scores if the game's level after 90. Change them any time before kickoff, then hit Save. All times shown in 🇮🇪 Irish time.</div>
+      <div class="hint">Group-stage picks are locked in 🔒. Knockout picks open here once those fixtures are set — <b>two picks</b> per game, worth <b>2 points</b>: <b>1</b> the 90-min result, and <b>2</b> who wins after extra time / penalties. The 2nd pick only scores if the game's level after 90. Change them any time up until <b>2 hours before kickoff</b>, when they lock — then hit Save. All times shown in 🇮🇪 Irish time.</div>
       <div id="predictList"></div>
     </div>
 
@@ -419,6 +419,12 @@ const toast = msg => { const t=$('toast'); t.textContent=msg; t.classList.add('s
 const fmtKO = iso => new Date(iso).toLocaleString('en-IE', {weekday:'short', month:'short',
   day:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'Europe/Dublin'});
 const started = m => new Date(m.kickoff) <= new Date();
+// Picks lock 2 hours BEFORE kickoff (editing closes then); others still don't
+// see your pick until actual kickoff. lockAt() is that cutoff for display.
+const LOCK_LEAD_MS = 2*60*60*1000;
+const lockAt = m => new Date(new Date(m.kickoff).getTime() - LOCK_LEAD_MS);
+const locked = m => lockAt(m) <= new Date();
+const fmtLock = m => fmtKO(lockAt(m).toISOString());
 // Group-stage picks are loaded once and locked — never editable from the site.
 const isGroup = m => (m.stage||'').toLowerCase().startsWith('group');
 const isKO    = m => !isGroup(m);
@@ -622,7 +628,7 @@ async function loadScorers(){
 
 /* ---------- predict tab ---------- */
 function renderPredict(){
-  const upcoming = matches.filter(m => !started(m) && !isGroup(m));
+  const upcoming = matches.filter(m => !locked(m) && !isGroup(m));
   const list = $('predictList');
   if(!upcoming.length){ list.innerHTML = `<div class="empty">No picks open right now.<br>Group-stage picks are locked in. Knockout picks open once those fixtures are confirmed.</div>`; return; }
   // Every game here is a knockout (group picks are locked) → 2 picks, 2 pts:
@@ -636,7 +642,7 @@ function renderPredict(){
   });
   list.innerHTML = upcoming.map(m => `
     <div class="match" style="--accent:${stageAccent(m.stage)}">
-      <div class="stage"><span class="st">${m.stage||''} · 2 pts</span><span class="ko">🔒 locks ${fmtKO(m.kickoff)}</span></div>
+      <div class="stage"><span class="st">${m.stage||''} · 2 pts</span><span class="ko">🔒 locks ${fmtLock(m)} (2h before KO)</span></div>
       <div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>
       <div class="hint" style="margin:8px 0 2px">1️⃣ Result after 90 minutes</div>
       <select class="ft" data-id="${m.id}">
@@ -665,7 +671,7 @@ function renderPredict(){
 }
 
 async function savePicks(){
-  const upcoming = matches.filter(m=>!started(m) && !isGroup(m)).map(m=>String(m.id));
+  const upcoming = matches.filter(m=>!locked(m) && !isGroup(m)).map(m=>String(m.id));
   // A game is "in progress" once either dropdown is set; both are required —
   // the 90-min result AND who wins after extra time / penalties.
   const touched = upcoming.filter(id => picks[id] || advances[id]);
@@ -716,11 +722,12 @@ function renderMine(){
   const teamOf = (m,side)=> side==='H' ? m.home_team : m.away_team;
   list.innerHTML = mine.map(m=>{
     const pr = myAll[m.id];
-    // For a knockout draw, also show who they backed to progress.
-    const advChip = (isKO(m) && pr.pick==='D' && pr.advance)
-      ? ` <span class="chip">Goes through: <b>${teamOf(m,pr.advance)}</b></span>` : '';
+    // Knockout games carry a 2nd pick — who wins after ET/pens — show it too.
+    const advChip = (isKO(m) && pr.advance)
+      ? ` <span class="chip">After ET/pens: <b>${teamOf(m,pr.advance)}</b></span>` : '';
+    const lockChip = locked(m) ? '🔒 locked' : `🔒 locks ${fmtLock(m)}`;
     return `<div class="match reveal" style="--accent:${stageAccent(m.stage)}">
-      <div class="stage"><span class="st">${m.stage||''}</span><span class="ko">🔒 locks ${fmtKO(m.kickoff)}</span></div>
+      <div class="stage"><span class="st">${m.stage||''}</span><span class="ko">${lockChip}</span></div>
       <div class="row"><div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div></div>
       <div class="picks"><span class="chip">Your pick: <b>${pickText(m,pr.pick)}</b></span>${advChip} <span class="lockmsg">🔒 hidden from others until kickoff</span></div>
     </div>`;
