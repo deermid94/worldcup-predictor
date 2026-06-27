@@ -50,6 +50,12 @@ async function main() {
       kickoff:    m.utcDate,
       home_score: m.status === 'FINISHED' ? (m.score?.fullTime?.home ?? null) : null,
       away_score: m.status === 'FINISHED' ? (m.score?.fullTime?.away ?? null) : null,
+      // Knockout scoring: who ultimately progressed + how it was decided.
+      // ET/PENS means the 90-minute result was a draw (that's why it went
+      // past 90), so the leaderboard infers a draw from `duration`.
+      winner:     m.status === 'FINISHED'
+        ? ({ HOME_TEAM: 'H', AWAY_TEAM: 'A' }[m.score?.winner] ?? null) : null,
+      duration:   m.status === 'FINISHED' ? (m.score?.duration ?? null) : null,
     }));
 
   if (!rows.length) { console.log('No usable matches yet — nothing to write.'); return; }

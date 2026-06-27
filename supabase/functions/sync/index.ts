@@ -56,6 +56,11 @@ Deno.serve(async () => {
       kickoff: m.utcDate,
       home_score: m.status === "FINISHED" ? (m.score?.fullTime?.home ?? null) : null,
       away_score: m.status === "FINISHED" ? (m.score?.fullTime?.away ?? null) : null,
+      // Knockout scoring: who progressed + how it was decided. ET/PENS ⇒
+      // the 90-minute result was a draw, inferred from `duration` downstream.
+      winner: m.status === "FINISHED"
+        ? (({ HOME_TEAM: "H", AWAY_TEAM: "A" } as Record<string, string>)[m.score?.winner] ?? null) : null,
+      duration: m.status === "FINISHED" ? (m.score?.duration ?? null) : null,
     }));
 
   if (!rows.length) return new Response("No usable matches yet — nothing to write.", { status: 200 });

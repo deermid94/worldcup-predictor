@@ -336,7 +336,7 @@
     </div>
 
     <div class="panel show" id="predict">
-      <div class="hint">Group-stage picks are locked in 🔒. Knockout picks open here once those fixtures are set — change them any time before kickoff, then hit Save. All times shown in 🇮🇪 Irish time.</div>
+      <div class="hint">Group-stage picks are locked in 🔒. Knockout picks open here once those fixtures are set — each is worth <b>2 points</b>: the full-time (90-min) result, plus who goes through if it's a draw. Change them any time before kickoff, then hit Save. All times shown in 🇮🇪 Irish time.</div>
       <div id="predictList"></div>
     </div>
 
@@ -351,7 +351,7 @@
     </div>
 
     <div class="panel" id="board">
-      <div class="hint">+1 point for every correct result, once the final score is entered.</div>
+      <div class="hint">+1 point for every correct group result. Knockouts are worth 2: +1 for the full-time (90-min) result and +1 for picking who goes through. Scored once the final result is in.</div>
       <div id="boardList"></div>
     </div>
 
@@ -406,10 +406,11 @@ const db = configured ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
 let nick = localStorage.getItem('wc_nick') || '';
 let lastPin = '';          // PIN entered this session (not persisted) — for quick re-use by Change PIN
 let matches = [];          // all fixtures
-let picks   = {};          // my picks {match_id: 'H'|'D'|'A'} (local source of truth)
+let picks   = {};          // my FT picks {match_id: 'H'|'D'|'A'} (local source of truth)
+let advances = {};         // my "who progresses" picks for knockout draws {match_id: 'H'|'A'}
 let revealed = [];         // predictions visible (post-kickoff) from the DB
 let scorers  = [];         // tournament top scorers (Golden Boot), synced from football-data
-let myAll    = null;       // {match_id: pick} — this player's OWN picks (PIN-verified), null until loaded
+let myAll    = null;       // {match_id: {pick, advance}} — this player's OWN picks (PIN-verified), null until loaded
 
 const toast = msg => { const t=$('toast'); t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),1800); };
@@ -420,8 +421,31 @@ const fmtKO = iso => new Date(iso).toLocaleString('en-IE', {weekday:'short', mon
 const started = m => new Date(m.kickoff) <= new Date();
 // Group-stage picks are loaded once and locked — never editable from the site.
 const isGroup = m => (m.stage||'').toLowerCase().startsWith('group');
+const isKO    = m => !isGroup(m);
 const outcome = m => (m.home_score==null||m.away_score==null) ? null
   : m.home_score>m.away_score ? 'H' : m.home_score<m.away_score ? 'A' : 'D';
+const wentPast90 = m => m.duration==='EXTRA_TIME' || m.duration==='PENALTY_SHOOTOUT';
+
+// Knockout full-time (90-minute) result, for the 1st point. If a game went to
+// extra time or penalties, it was level after 90 → a draw by definition.
+const koFTResult = m => (m.home_score==null||m.away_score==null) ? null
+  : wentPast90(m) ? 'D' : outcome(m);
+// The team that progressed, for the 2nd point. Prefer the feed's winner;
+// fall back to the regular-time result when winner isn't populated.
+const koProgressor = m => {
+  if(m.home_score==null||m.away_score==null) return null;
+  if(m.winner==='H'||m.winner==='A') return m.winner;
+  const o = outcome(m); return o==='D' ? null : o;
+};
+// Which side a prediction backs to progress. A Home/Away FT pick implies that
+// side; only a Draw pick carries an independent `advance` choice.
+const advOf = pred => pred.advance || (pred.pick==='H'?'H':pred.pick==='A'?'A':null);
+// Points a single prediction earns on a finished match (null = not scored yet).
+function pickPoints(m, pred){
+  if(m.home_score==null||m.away_score==null) return null;
+  if(isGroup(m)) return pred.pick===outcome(m) ? 1 : 0;
+  return (pred.pick===koFTResult(m) ? 1 : 0) + (advOf(pred)===koProgressor(m) ? 1 : 0);
+}
 
 // per-stage accent colour: groups→emerald, R16→teal, QF→blue, SF→purple, 3rd→orange, final→gold
 const stageAccent = stage => {
@@ -561,12 +585,13 @@ async function loadMatches(){
 }
 async function loadRevealed(){
   // RLS only returns predictions for matches that have kicked off
-  const { data, error } = await db.from('predictions').select('player,match_id,pick');
+  const { data, error } = await db.from('predictions').select('player,match_id,pick,advance');
   if(error) throw error;
   revealed = data || [];
 }
 function loadMyPicks(){
-  picks = JSON.parse(localStorage.getItem('wc_picks_'+nick) || '{}');
+  picks    = JSON.parse(localStorage.getItem('wc_picks_'+nick) || '{}');
+  advances = JSON.parse(localStorage.getItem('wc_adv_'+nick)   || '{}');
 }
 // Fetch THIS player's own picks (all of them, incl. locked group picks), PIN-verified
 // server-side. Returns the number of picks found (0 = wrong PIN or none, -1 = error).
@@ -575,7 +600,7 @@ async function loadMyAll(pin){
     const { data, error } = await db.rpc('my_predictions', { p_name:nick, p_pin:pin });
     if(error) throw error;
     if(!data || !data.length){ return 0; }
-    const all = {}; data.forEach(r=> all[r.match_id] = r.pick);
+    const all = {}; data.forEach(r=> all[r.match_id] = { pick:r.pick, advance:r.advance });
     myAll = all; lastPin = pin;
     return data.length;
   }catch(e){ console.warn('my_predictions failed:', e.message||e); return -1; }
@@ -595,32 +620,63 @@ function renderPredict(){
   const upcoming = matches.filter(m => !started(m) && !isGroup(m));
   const list = $('predictList');
   if(!upcoming.length){ list.innerHTML = `<div class="empty">No picks open right now.<br>Group-stage picks are locked in. Knockout picks open once those fixtures are confirmed.</div>`; return; }
-  list.innerHTML = upcoming.map(m => `
+  // Every game in this tab is a knockout (group picks are locked), so each
+  // one is worth 2 pts: the full-time (90-min) result + who goes through.
+  // The "who goes through" pick only matters on a Draw — a Home/Away pick
+  // already says who progresses — so it only appears when Draw is selected.
+  list.innerHTML = upcoming.map(m => {
+    const drawn = picks[m.id]==='D';
+    return `
     <div class="match" style="--accent:${stageAccent(m.stage)}">
-      <div class="stage"><span class="st">${m.stage||''}</span><span class="ko">🔒 locks ${fmtKO(m.kickoff)}</span></div>
+      <div class="stage"><span class="st">${m.stage||''} · 2 pts</span><span class="ko">🔒 locks ${fmtKO(m.kickoff)}</span></div>
       <div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>
-      <select data-id="${m.id}">
-        <option value="">— pick a result —</option>
+      <select class="ft" data-id="${m.id}">
+        <option value="">— pick the 90-min result —</option>
         <option value="H" ${picks[m.id]==='H'?'selected':''}>${m.home_team} to win</option>
-        <option value="D" ${picks[m.id]==='D'?'selected':''}>Draw</option>
+        <option value="D" ${picks[m.id]==='D'?'selected':''}>Draw after 90</option>
         <option value="A" ${picks[m.id]==='A'?'selected':''}>${m.away_team} to win</option>
       </select>
-    </div>`).join('')
+      <div class="adv-wrap" data-adv-for="${m.id}" style="${drawn?'':'display:none'}">
+        <div class="hint" style="margin:8px 0 0">If it's a draw, who goes through (extra time / penalties)?</div>
+        <select class="adv" data-id="${m.id}">
+          <option value="">— who progresses? —</option>
+          <option value="H" ${advances[m.id]==='H'?'selected':''}>${m.home_team}</option>
+          <option value="A" ${advances[m.id]==='A'?'selected':''}>${m.away_team}</option>
+        </select>
+      </div>
+    </div>`; }).join('')
     + `<button class="primary save" id="saveBtn">Save my picks</button>`;
-  list.querySelectorAll('select').forEach(sel=>{
+  list.querySelectorAll('select.ft').forEach(sel=>{
     sel.onchange = ()=>{ const id=sel.dataset.id;
-      if(sel.value) picks[id]=sel.value; else delete picks[id]; };
+      if(sel.value) picks[id]=sel.value; else delete picks[id];
+      // reveal the "who progresses" pick only for a Draw; clear it otherwise
+      const wrap = list.querySelector(`.adv-wrap[data-adv-for="${id}"]`);
+      if(sel.value==='D'){ wrap.style.display=''; }
+      else { wrap.style.display='none'; delete advances[id];
+             const a = wrap.querySelector('select.adv'); if(a) a.value=''; }
+    };
+  });
+  list.querySelectorAll('select.adv').forEach(sel=>{
+    sel.onchange = ()=>{ const id=sel.dataset.id;
+      if(sel.value) advances[id]=sel.value; else delete advances[id]; };
   });
   $('saveBtn').onclick = savePicks;
 }
 
 async function savePicks(){
   const upcoming = matches.filter(m=>!started(m) && !isGroup(m)).map(m=>String(m.id));
-  const rows = Object.entries(picks)
-    .filter(([id,p]) => upcoming.includes(String(id)) && p)
-    .map(([id,p]) => ({ player:nick, match_id:Number(id), pick:p }));
+  const chosen = Object.entries(picks).filter(([id,p]) => upcoming.includes(String(id)) && p);
+  // A Draw pick must say who goes through (extra time / penalties).
+  if(chosen.some(([id,p]) => p==='D' && !advances[id])){
+    toast('For a draw, pick who goes through'); return;
+  }
+  const rows = chosen.map(([id,p]) => ({
+    player:nick, match_id:Number(id), pick:p,
+    advance: p==='H' ? 'H' : p==='A' ? 'A' : (advances[id] || null),  // win pick implies the side
+  }));
   // keep my own copy locally (the DB hides it from me until kickoff)
   localStorage.setItem('wc_picks_'+nick, JSON.stringify(picks));
+  localStorage.setItem('wc_adv_'+nick,   JSON.stringify(advances));
   if(!rows.length){ toast('Pick at least one game'); return; }
   const { error } = await db.from('predictions').upsert(rows, { onConflict:'player,match_id' });
   if(error){ toast('Save failed'); console.error(error); return; }
@@ -656,12 +712,16 @@ function renderMine(){
     .sort((a,b)=> new Date(a.kickoff)-new Date(b.kickoff));
   if(!mine.length){ list.innerHTML = `<div class="empty">No upcoming picks right now.<br>Picks for games that have kicked off are over in the <b>Reveal</b> tab. New knockout picks will appear here once you've made them.</div>`; return; }
   const pickText = (m,p)=> p==='H' ? `${m.home_team} to win` : p==='A' ? `${m.away_team} to win` : 'Draw';
+  const teamOf = (m,side)=> side==='H' ? m.home_team : m.away_team;
   list.innerHTML = mine.map(m=>{
-    const p = myAll[m.id];
+    const pr = myAll[m.id];
+    // For a knockout draw, also show who they backed to progress.
+    const advChip = (isKO(m) && pr.pick==='D' && pr.advance)
+      ? ` <span class="chip">Goes through: <b>${teamOf(m,pr.advance)}</b></span>` : '';
     return `<div class="match reveal" style="--accent:${stageAccent(m.stage)}">
       <div class="stage"><span class="st">${m.stage||''}</span><span class="ko">🔒 locks ${fmtKO(m.kickoff)}</span></div>
       <div class="row"><div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div></div>
-      <div class="picks"><span class="chip">Your pick: <b>${pickText(m,p)}</b></span> <span class="lockmsg">🔒 hidden from others until kickoff</span></div>
+      <div class="picks"><span class="chip">Your pick: <b>${pickText(m,pr.pick)}</b></span>${advChip} <span class="lockmsg">🔒 hidden from others until kickoff</span></div>
     </div>`;
   }).join('');
 }
@@ -674,18 +734,37 @@ function renderReveal(){
                          .sort((a,b)=>new Date(b.kickoff)-new Date(a.kickoff));
   const list = $('revealList');
   if(!visible.length){ list.innerHTML = `<div class="empty">No games have kicked off yet.</div>`; return; }
+  const teamOf = (m,side)=> side==='H' ? m.home_team : m.away_team;
   list.innerHTML = visible.map(m=>{
-    const res = outcome(m);
+    const scored = m.home_score!=null && m.away_score!=null;
     const ps = revealed.filter(r=>r.match_id===m.id);
-    const chips = ps.length ? ps.map(r=>{
-      const cls = res ? (r.pick===res?'hit':'miss') : '';
-      return `<span class="chip ${cls}">${esc(r.player)}: <b>${PICK_LABEL[r.pick]||'?'}</b>${res&&r.pick===res?' ✓':''}</span>`;
-    }).join('') : `<span class="pending">No picks were submitted.</span>`;
-    const scoreLine = res
-      ? `<span class="result">${m.home_score}–${m.away_score} · ${PICK_LABEL[res]}</span>`
-      : `<span class="pending">${started(m)?'awaiting result':'not started — picks shown'}</span>`;
+    let chips, scoreLine;
+    if(isKO(m)){
+      // Knockout: two points — full-time (90-min) result + who progresses.
+      const ftRes = koFTResult(m), prog = koProgressor(m);
+      chips = ps.length ? ps.map(r=>{
+        const adv = advOf(r), advName = adv ? teamOf(m,adv) : '?';
+        const ftOK = scored && r.pick===ftRes, adOK = scored && adv===prog;
+        const pts = (ftOK?1:0)+(adOK?1:0);
+        const cls = !scored ? '' : pts===2 ? 'hit' : pts===0 ? 'miss' : '';
+        return `<span class="chip ${cls}">${esc(r.player)}: <b>${PICK_LABEL[r.pick]||'?'}</b>${ftOK?' ✓':''} → through: <b>${esc(advName)}</b>${adOK?' ✓':''}${scored?` · ${pts} pt${pts===1?'':'s'}`:''}</span>`;
+      }).join('') : `<span class="pending">No picks were submitted.</span>`;
+      const dur = m.duration==='PENALTY_SHOOTOUT' ? ' (pens)' : m.duration==='EXTRA_TIME' ? ' (AET)' : '';
+      scoreLine = scored
+        ? `<span class="result">${m.home_score}–${m.away_score}${dur}${prog?` · ${esc(teamOf(m,prog))} go through`:''}</span>`
+        : `<span class="pending">${started(m)?'awaiting result':'not started — picks shown'}</span>`;
+    } else {
+      const res = outcome(m);
+      chips = ps.length ? ps.map(r=>{
+        const cls = res ? (r.pick===res?'hit':'miss') : '';
+        return `<span class="chip ${cls}">${esc(r.player)}: <b>${PICK_LABEL[r.pick]||'?'}</b>${res&&r.pick===res?' ✓':''}</span>`;
+      }).join('') : `<span class="pending">No picks were submitted.</span>`;
+      scoreLine = res
+        ? `<span class="result">${m.home_score}–${m.away_score} · ${PICK_LABEL[res]}</span>`
+        : `<span class="pending">${started(m)?'awaiting result':'not started — picks shown'}</span>`;
+    }
     return `<div class="match reveal" style="--accent:${stageAccent(m.stage)}">
-      <div class="stage"><span class="st">${m.stage||''}</span><span class="ko">${fmtKO(m.kickoff)}</span></div>
+      <div class="stage"><span class="st">${m.stage||''}${isKO(m)?' · 2 pts':''}</span><span class="ko">${fmtKO(m.kickoff)}</span></div>
       <div class="row"><div class="teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>${scoreLine}</div>
       <div class="picks">${chips}</div>
     </div>`;
@@ -696,9 +775,9 @@ function renderReveal(){
 function renderBoard(){
   const scores = {};
   matches.forEach(m=>{
-    const res = outcome(m); if(!res) return;
+    if(m.home_score==null || m.away_score==null) return;  // not scored yet
     revealed.filter(r=>r.match_id===m.id).forEach(r=>{
-      scores[r.player] = (scores[r.player]||0) + (r.pick===res?1:0);
+      scores[r.player] = (scores[r.player]||0) + (pickPoints(m, r) ?? 0);
     });
   });
   // make sure everyone who ever picked shows up, even on 0
