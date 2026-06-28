@@ -679,14 +679,19 @@ async function savePicks(){
     toast('Each game needs both picks: the 90-min result AND who wins after ET/pens'); return;
   }
   const rows = touched.map(id => ({
-    player:nick, match_id:Number(id), pick:picks[id], advance:advances[id],
+    match_id:Number(id), pick:picks[id], advance:advances[id],
   }));
   // keep my own copy locally (the DB hides it from me until kickoff)
   localStorage.setItem('wc_picks_'+nick, JSON.stringify(picks));
   localStorage.setItem('wc_adv_'+nick,   JSON.stringify(advances));
   if(!rows.length){ toast('Pick at least one game'); return; }
-  const { error } = await db.from('predictions').upsert(rows, { onConflict:'player,match_id' });
-  if(error){ toast('Save failed'); console.error(error); return; }
+  // Save through a SECURITY DEFINER RPC, not a direct upsert: the no-peek
+  // SELECT rule blocks an upsert's ON CONFLICT lookup (→ every save failed).
+  // The function does the upsert server-side and re-checks the 2h lock +
+  // knockout-only. Returns count saved, 0 = all locked, -1 = unknown player.
+  const { data, error } = await db.rpc('save_picks', { p_name:nick, p_picks:rows });
+  if(error || data === -1){ toast('Save failed'); console.error(error || 'player rejected'); return; }
+  if(data === 0){ toast('Too late — those games have locked'); return; }
   toast('✓ Saved — locked secrets!');
 }
 
