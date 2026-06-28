@@ -177,6 +177,11 @@
 
   .save{position:sticky;bottom:14px;margin-top:12px;width:100%;padding:16px;
     font-size:1rem;letter-spacing:.03em}
+  .saverow{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+  .save-one{padding:11px 20px;font-size:.92rem;width:auto}
+  .savemsg{font-size:.82rem;color:var(--muted)}
+  .savemsg.ok{color:var(--emerald);font-weight:700}
+  .savemsg.err{color:#ff6b6b;font-weight:600}
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);
     background:linear-gradient(180deg,var(--emerald),var(--emerald-d));color:#042611;
     padding:12px 20px;border-radius:12px;font-weight:700;opacity:0;pointer-events:none;z-index:50;
@@ -657,42 +662,49 @@ function renderPredict(){
         <option value="H" ${advances[m.id]==='H'?'selected':''}>${m.home_team}</option>
         <option value="A" ${advances[m.id]==='A'?'selected':''}>${m.away_team}</option>
       </select>
-    </div>`).join('')
-    + `<button class="primary save" id="saveBtn">Save my picks</button>`;
+      <div class="saverow">
+        <button class="primary save-one" data-id="${m.id}">Save this pick</button>
+        <span class="savemsg" data-msg-for="${m.id}">${(picks[m.id]&&advances[m.id])?'saved ✓ — change any time before it locks':''}</span>
+      </div>
+    </div>`).join('');
+  // Each game saves on its own. Changing a dropdown marks it unsaved again.
   list.querySelectorAll('select.ft').forEach(sel=>{
     sel.onchange = ()=>{ const id=sel.dataset.id;
-      if(sel.value) picks[id]=sel.value; else delete picks[id]; };
+      if(sel.value) picks[id]=sel.value; else delete picks[id];
+      setSaveMsg(id, 'not saved yet — hit Save this pick', ''); };
   });
   list.querySelectorAll('select.adv').forEach(sel=>{
     sel.onchange = ()=>{ const id=sel.dataset.id;
-      if(sel.value) advances[id]=sel.value; else delete advances[id]; };
+      if(sel.value) advances[id]=sel.value; else delete advances[id];
+      setSaveMsg(id, 'not saved yet — hit Save this pick', ''); };
   });
-  $('saveBtn').onclick = savePicks;
+  list.querySelectorAll('button.save-one').forEach(btn=>{
+    btn.onclick = ()=> savePick(btn.dataset.id);
+  });
 }
 
-async function savePicks(){
-  const upcoming = matches.filter(m=>!locked(m) && !isGroup(m)).map(m=>String(m.id));
-  // A game is "in progress" once either dropdown is set; both are required —
-  // the 90-min result AND who wins after extra time / penalties.
-  const touched = upcoming.filter(id => picks[id] || advances[id]);
-  if(touched.some(id => !(picks[id] && advances[id]))){
-    toast('Each game needs both picks: the 90-min result AND who wins after ET/pens'); return;
+function setSaveMsg(id, text, kind){
+  const el = document.querySelector(`.savemsg[data-msg-for="${id}"]`);
+  if(el){ el.textContent = text; el.className = 'savemsg' + (kind ? ' '+kind : ''); }
+}
+
+// Save ONE game's pick. Both halves required; saved server-side via the RPC.
+async function savePick(id){
+  if(!(picks[id] && advances[id])){
+    setSaveMsg(id, 'Pick both: the 90-min result AND who wins after ET/pens', 'err'); return;
   }
-  const rows = touched.map(id => ({
-    match_id:Number(id), pick:picks[id], advance:advances[id],
-  }));
   // keep my own copy locally (the DB hides it from me until kickoff)
   localStorage.setItem('wc_picks_'+nick, JSON.stringify(picks));
   localStorage.setItem('wc_adv_'+nick,   JSON.stringify(advances));
-  if(!rows.length){ toast('Pick at least one game'); return; }
-  // Save through a SECURITY DEFINER RPC, not a direct upsert: the no-peek
-  // SELECT rule blocks an upsert's ON CONFLICT lookup (→ every save failed).
-  // The function does the upsert server-side and re-checks the 2h lock +
-  // knockout-only. Returns count saved, 0 = all locked, -1 = unknown player.
-  const { data, error } = await db.rpc('save_picks', { p_name:nick, p_picks:rows });
-  if(error || data === -1){ toast('Save failed'); console.error(error || 'player rejected'); return; }
-  if(data === 0){ toast('Too late — those games have locked'); return; }
-  toast('✓ Saved — locked secrets!');
+  setSaveMsg(id, 'saving…', '');
+  // SECURITY DEFINER RPC (not a direct upsert — the no-peek rule blocks that);
+  // it re-checks the 2h lock + knockout-only. Returns 1 saved / 0 locked / -1 bad player.
+  const { data, error } = await db.rpc('save_picks', { p_name:nick, p_picks:[
+    { match_id:Number(id), pick:picks[id], advance:advances[id] }
+  ]});
+  if(error || data === -1){ setSaveMsg(id, 'Save failed — try again', 'err'); console.error(error || 'player rejected'); return; }
+  if(data === 0){ setSaveMsg(id, 'Too late — this game has locked', 'err'); return; }
+  setSaveMsg(id, '✓ Saved — change any time before it locks', 'ok');
 }
 
 /* ---------- my picks (private reminder) ---------- */
