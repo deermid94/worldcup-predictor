@@ -174,6 +174,12 @@
   .lb .rank-1 .bar i{background:linear-gradient(90deg,#ffd24a,#ffae1f)}
   .lb .rank-1 .pts{color:var(--gold)}
   .lb .me{background:rgba(47,212,122,.09);box-shadow:inset 3px 0 0 var(--emerald)}
+  .lb .badges{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px}
+  .lb .chip{display:inline-flex;align-items:center;gap:3px;font-size:.64rem;font-weight:800;
+    padding:2px 8px;border-radius:999px;line-height:1.45;font-variant-numeric:tabular-nums;
+    white-space:nowrap}
+  .lb .chip.fire{background:rgba(255,138,42,.16);color:#ffb066;border:1px solid rgba(255,138,42,.38)}
+  .lb .chip.bolt{background:rgba(120,160,255,.16);color:#9db8ff;border:1px solid rgba(120,160,255,.38)}
 
   .save{position:sticky;bottom:14px;margin-top:12px;width:100%;padding:16px;
     font-size:1rem;letter-spacing:.03em}
@@ -356,7 +362,7 @@
     </div>
 
     <div class="panel" id="board">
-      <div class="hint">+1 point for every correct group result. Knockouts are worth 2: +1 for the full-time (90-min) result and +1 for picking who goes through. Scored once the final result is in.</div>
+      <div class="hint">+1 point for every correct group result. Knockouts are worth 2: +1 for the full-time (90-min) result and +1 for picking who goes through. Scored once the final result is in. <b>🔥</b> = correct calls in a row · <b>⚡</b> = knockout doubles (called the ET/pens draw <i>and</i> who went through).</div>
       <div id="boardList"></div>
     </div>
 
@@ -806,14 +812,27 @@ function renderReveal(){
 /* ---------- leaderboard ---------- */
 function renderBoard(){
   const scores = {};
+  const hist = {};   // hist[player] = [{t:kickoff, pts, ko}]  (per scored pick)
   matches.forEach(m=>{
     if(m.home_score==null || m.away_score==null) return;  // not scored yet
     revealed.filter(r=>r.match_id===m.id).forEach(r=>{
-      scores[r.player] = (scores[r.player]||0) + (pickPoints(m, r) ?? 0);
+      const pts = pickPoints(m, r) ?? 0;
+      scores[r.player] = (scores[r.player]||0) + pts;
+      (hist[r.player] = hist[r.player] || []).push({ t:new Date(m.kickoff).getTime(), pts, ko:isKO(m) });
     });
   });
   // make sure everyone who ever picked shows up, even on 0
   revealed.forEach(r=>{ if(!(r.player in scores)) scores[r.player]=0; });
+  // Per-player flair: current streak (trailing run of games with any points, in
+  // kickoff order) and "doubles" (knockout games where they banked the full 2 —
+  // the ET/pens draw AND who progressed).
+  const streakOf = {}, doublesOf = {};
+  for(const p in hist){
+    const games = hist[p].sort((a,b)=>a.t-b.t);
+    let s=0; for(let i=games.length-1;i>=0;i--){ if(games[i].pts>0) s++; else break; }
+    streakOf[p] = s;
+    doublesOf[p] = games.filter(g=>g.ko && g.pts===2).length;
+  }
   const ranked = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
   const list = $('boardList');
   if(!ranked.length){ list.innerHTML = `<div class="empty">No results scored yet.<br>Standings appear once final scores are entered.</div>`; return; }
@@ -823,10 +842,16 @@ function renderBoard(){
     const lead = i<3 && pts>0 ? `<span class="medal">${MEDAL[i]}</span>`
                               : `<span class="rank">${i+1}</span>`;
     const pct = Math.max(pts>0?6:0, Math.round(pts/max*100));
+    const streak = streakOf[name]||0, doubles = doublesOf[name]||0;
+    const badges = [];
+    if(streak>=2) badges.push(`<span class="chip fire" title="${streak} correct calls in a row">🔥 ${streak}</span>`);
+    if(doubles>=1) badges.push(`<span class="chip bolt" title="${doubles} knockout double${doubles===1?'':'s'} — called the ET/pens draw AND who went through (full 2 pts)">⚡ ${doubles}</span>`);
+    const badgeRow = badges.length ? `<div class="badges">${badges.join('')}</div>` : '';
     return `<div class="lrow rank-${i+1} ${name===nick?'me':''}">
       ${lead}
       <div class="info">
         <span class="name">${esc(name)}</span>
+        ${badgeRow}
         <div class="bar"><i data-w="${pct}" style="width:0%"></i></div>
       </div>
       <span class="pts"><span class="n" data-to="${pts}">0</span><small>pt${pts===1?'':'s'}</small></span>
