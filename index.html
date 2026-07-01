@@ -428,7 +428,10 @@ const started = m => new Date(m.kickoff) <= new Date();
 // see your pick until actual kickoff. lockAt() is that cutoff for display.
 const LOCK_LEAD_MS = 2*60*60*1000;
 const lockAt = m => new Date(new Date(m.kickoff).getTime() - LOCK_LEAD_MS);
-const locked = m => lockAt(m) <= new Date();
+// The whole Last 32 round was locked up front (crew submitted full brackets),
+// so every 'LAST 32' game is locked regardless of kickoff. Later rounds keep
+// the rolling 2h-before-kickoff lock. (Mirrors lock-last32.sql server-side.)
+const locked = m => (m.stage||'').toUpperCase()==='LAST 32' || lockAt(m) <= new Date();
 const fmtLock = m => fmtKO(lockAt(m).toISOString());
 // Group-stage picks are loaded once and locked — never editable from the site.
 const isGroup = m => (m.stage||'').toLowerCase().startsWith('group');
