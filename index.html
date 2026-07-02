@@ -271,6 +271,8 @@
   .bkt-row.win .tn{color:var(--lime);font-weight:800}
   .bkt-row.win .sc{color:var(--lime)}
   .bkt-row.tbd{opacity:.5;font-style:italic;font-weight:500}
+  .bkt-when{border-top:1px solid var(--line);padding:5px 10px;font-size:.66rem;font-weight:700;
+    letter-spacing:.02em;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap}
 
   /* ============ top scorers (golden boot) ============ */
   .sc-list{background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
@@ -1007,7 +1009,7 @@ function renderBracket(){
       sb = conf.home_team===a ? conf.away_score : conf.home_score;
       win = sa>=sb ? a : b;
     }
-    return { a, b, sa, sb, played, conf:!!conf, win };
+    return { a, b, sa, sb, played, conf:!!conf, win, ko: conf?.kickoff || null };
   };
 
   // R32: resolve projected pairings, then overlay confirmed feed fixtures by matching
@@ -1044,6 +1046,7 @@ function renderBracket(){
   const tieHTML = n => `<div class="bkt-tie ${n.conf?'conf':'proj'}">
       ${teamRow(n.a, n.a&&n.win===n.a, n.played?n.sa:null)}
       ${teamRow(n.b, n.b&&n.win===n.b, n.played?n.sb:null)}
+      ${n.ko ? `<div class="bkt-when">🇮🇪 ${fmtKO(n.ko)}</div>` : ''}
     </div>`;
   const cols = rounds.map((nodes,ci)=>{
     const isFinal = nodes.length===1;
